@@ -1,3 +1,4 @@
+#pragma once
 #include <kernel/syscallno.h>
 #include <kernel/proc.h>
 #include <kernel/init.h>

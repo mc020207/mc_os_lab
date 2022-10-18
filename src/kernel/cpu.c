@@ -44,6 +44,9 @@ static void timer_clock_handler() {
         timer->triggered = true;
         timer->handler(timer);
     }
+    printk("CPU%d:clock\n",cpuid());
+    reset_clock(1000);
+    return ;
 }
 
 define_early_init(clock_handler) {
