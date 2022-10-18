@@ -125,11 +125,13 @@ static void update_this_proc(struct proc* p)
     //TODO: if using simple_sched, you should implement this routinue
     // update thisproc to the choosen process, and reset the clock interrupt if need
     // reset_clock(1000);
+    cpus[cpuid()].sched.thisproc=p;
+    if (p->idle) return ;
     if (!sched_timer[cpuid()].triggered){
         cancel_cpu_timer(&sched_timer[cpuid()]);
     }
     set_cpu_timer(&sched_timer[cpuid()]);
-    cpus[cpuid()].sched.thisproc=p;
+    
 }
 
 // A simple scheduler.
@@ -165,7 +167,7 @@ u64 proc_entry(void(*entry)(u64), u64 arg)
 }
 
 void sched_timer_handler(struct timer* timerr){
+    timerr->data=0;
     _acquire_sched_lock();
     _sched(RUNNABLE);
-    timerr->data=0;
 }   
