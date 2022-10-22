@@ -14,6 +14,8 @@ pushp(x6,x7)
 pushp(x4,x5)
 pushp(x2,x3)
 pushp(x0,x1)
+mrs x1,sp_el0
+pushp(lr,x1)
 mrs x0,spsr_el1
 mrs x1,elr_el1
 pushp(x0,x1)
@@ -25,6 +27,8 @@ trap_return:
 popp(x0,x1)
 msr spsr_el1,x0
 msr elr_el1,x1
+popp(lr,x1)
+msr sp_el0,x1
 popp(x0,x1)
 popp(x2,x3)
 popp(x4,x5)

@@ -17,6 +17,12 @@ static struct timer sched_timer[NCPU];
 define_early_init(rq){
     init_spinlock(&rqlock);
     init_list_node(&rq);
+    for (int i=0;i<NCPU;i++){
+        sched_timer[i].triggered=1;
+        sched_timer[i].data=i;
+        sched_timer[i].elapse=10;
+        sched_timer[i].handler=&sched_timer_handler;
+    }
 }
 
 define_init(sched){
@@ -26,10 +32,6 @@ define_init(sched){
         p->idle=1;
         p->state=RUNNING;
         cpus[i].sched.thisproc=cpus[i].sched.idle=p;
-        sched_timer[i].triggered=1;
-        sched_timer[i].data=i;
-        sched_timer[i].elapse=10;
-        sched_timer[i].handler=&sched_timer_handler;
     }
 }
 
@@ -126,12 +128,11 @@ static void update_this_proc(struct proc* p)
     // update thisproc to the choosen process, and reset the clock interrupt if need
     // reset_clock(1000);
     cpus[cpuid()].sched.thisproc=p;
-    if (p->idle) return ;
+    // if (p->idle) return ;
     if (!sched_timer[cpuid()].triggered){
         cancel_cpu_timer(&sched_timer[cpuid()]);
     }
     set_cpu_timer(&sched_timer[cpuid()]);
-    
 }
 
 // A simple scheduler.

@@ -11,7 +11,7 @@ enum procstate { UNUSED, RUNNABLE, RUNNING, SLEEPING, ZOMBIE };
 typedef struct UserContext
 {
     //TODO: customize your trap frame
-    u64 spsr,elr;
+    u64 spsr,elr,lr,sp;
     u64 x[18];
 } UserContext;
 
@@ -22,6 +22,18 @@ typedef struct KernelContext
     u64 x[11]; // x19-29
 
 } KernelContext;
+
+// pid manager's node
+typedef struct s_pid_node {
+    int pid;
+    ListNode node;
+} PIDNode;
+
+// pid manager
+typedef struct s_pid_manager {
+    int max; // max_pid
+    PIDNode freep; // free list of pid
+} PIDManager;
 
 struct proc
 {
