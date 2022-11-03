@@ -39,7 +39,8 @@ ALWAYS_INLINE u32 get_and_clear_EMMC_INTERRUPT() {
  *
  * See https://en.wikipedia.org/wiki/Master_boot_record
  */
-
+static SpinLock sdlock;
+ListNode buflist;
 void sd_init() {
     /*
      * 1.call sdInit.
@@ -56,6 +57,11 @@ void sd_init() {
      * 4.don't forget to call this function somewhere
      * TODO: Lab5 driver.
      */
+    sdInit();
+    init_spinlock(&sdlock);
+    init_list_node(&buflist);
+    set_interrupt_handler(IRQ_ARASANSDIO,sd_intr);
+    set_interrupt_handler(IRQ_SDIO,sd_intr);
 }
 
 /* Start the request for b. Caller must hold sdlock. */
@@ -66,7 +72,6 @@ static void sd_start(struct buf* b) {
     int bno =
         sdCard.type == SD_TYPE_2_HC ? (int)b->blockno : (int)b->blockno << 9;
     int write = b->flags & B_DIRTY;
-
     // printk("- sd start: cpu %d, flag 0x%x, bno %d, write=%d\n", cpuid(),
     // b->flags, bno, write);
 
@@ -84,9 +89,8 @@ static void sd_start(struct buf* b) {
 
     int resp;
     *EMMC_BLKSIZECNT = 512;
-
     if ((resp = sdSendCommandA(cmd, bno))) {
-        printk("* EMMC send command error.\n");
+        printk("* EMMC send command error. %d\n",resp);
         PANIC();
     }
 
@@ -96,7 +100,7 @@ static void sd_start(struct buf* b) {
         printk("Only support word-aligned buffers. \n");
         PANIC();
     }
-
+    
     if (write) {
         // Wait for ready interrupt for the next block.
         if ((resp = sdWaitForInterrupt(INT_WRITE_RDY))) {
@@ -108,8 +112,9 @@ static void sd_start(struct buf* b) {
             printk("%d\n", *EMMC_INTERRUPT);
             PANIC();
         }
-        while (done < 128)
+        while (done < 128){
             *EMMC_DATA = intbuf[done++];
+        }
     }
 }
 
@@ -136,6 +141,46 @@ void sd_intr() {
      *
      * TODO: Lab5 driver.
      */
+    _acquire_spinlock(&sdlock);
+    buf *t=container_of(buflist.next,buf,lnode);
+    if (t->flags&B_DIRTY){
+        sdWaitForInterrupt(INT_DATA_DONE);
+        // int resp,done=0;
+        // if ((resp = sdWaitForInterrupt(INT_WRITE_RDY))) {
+        //     printk("* EMMC ERROR: Timeout waiting for ready to write\n");
+        //     PANIC();
+        // }
+        // if (*EMMC_INTERRUPT) {
+        //     printk("%d\n", *EMMC_INTERRUPT);
+        //     PANIC();
+        // }
+        // while (done < 128){
+        //     *EMMC_DATA = t->data[done++];
+        // }
+    }else if (!(t->flags&B_VALID)){
+        int resp,done=0;
+        if ((resp = sdWaitForInterrupt(INT_READ_RDY))) {
+            printk("* EMMC ERROR: Timeout waiting for ready to read\n");
+            PANIC();
+        }
+        if (*EMMC_INTERRUPT) {
+            printk("%d\n", *EMMC_INTERRUPT);
+            PANIC();
+        }
+        u32* intbuf = (u32*)t->data;
+        while (done < 128){
+            intbuf[done++]=*EMMC_DATA ;
+        }
+        sdWaitForInterrupt(INT_DATA_DONE);
+    }
+    _detach_from_list(&t->lnode);
+    t->flags=B_VALID;
+    post_sem(&t->bufsem);
+    if (!_empty_list(&buflist)){
+        // get_and_clear_EMMC_INTERRUPT();
+        sd_start(container_of(buflist.next,buf,lnode));
+    }
+    _release_spinlock(&sdlock);
 }
 
 void sdrw(buf* b) {
@@ -148,6 +193,18 @@ void sdrw(buf* b) {
      * sd_start(), wait_sem() to complete this function.
      *  TODO: Lab5 driver.
      */
+    _acquire_spinlock(&sdlock);
+    init_sem(&b->bufsem,0);
+    _insert_into_list(buflist.prev,&b->lnode);
+    buf *t=container_of(buflist.next,buf,lnode);
+    if (t==b){
+        // get_and_clear_EMMC_INTERRUPT();
+        sd_start(t);
+    }
+    _release_spinlock(&sdlock);
+    while ((b->flags&(B_VALID|B_DIRTY))!=B_VALID){
+        wait_sem(&b->bufsem);
+    }
 }
 
 /* SD card test and benchmark. */
@@ -165,6 +222,7 @@ void sd_test() {
     printk("- sd check rw...\n");
     // Read/write test
     for (int i = 1; i < n; i++) {
+
         // Backup.
         b[0].flags = 0;
         b[0].blockno = (u32)i;
@@ -175,7 +233,7 @@ void sd_test() {
         for (int j = 0; j < BSIZE; j++)
             b[i].data[j] = (u8)((i * j) & 0xFF);
         sdrw(&b[i]);
-
+        // printk("test %d\n",i);
         memset(b[i].data, 0, sizeof(b[i].data));
         // Read back and check
         b[i].flags = 0;

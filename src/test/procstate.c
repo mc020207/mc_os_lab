@@ -95,7 +95,6 @@ static void proc_test_1a(u64 a)
 
 static void proc_test_1()
 {
-    printk("proc_test_1\n");
     init_sem(&s1, 0);
     init_sem(&s2, 0);
     init_sem(&s3, 0);
