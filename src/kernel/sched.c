@@ -84,11 +84,11 @@ bool _activate_proc(struct proc* p, bool onalert)
     // if the proc->state is SLEEPING/UNUSED, set the process state to RUNNABLE, add it to the sched queue, and return true
     // if the proc->state is DEEPSLEEING, do nothing if onalert or activate it if else, and return the corresponding value.
     _acquire_sched_lock();
-    if (p->state==RUNNING||p->state==RUNNABLE||p->state==ZOMBIE){
+    if (p->state==RUNNING||p->state==RUNNABLE||p->state==ZOMBIE||(p->state==DEEPSLEEPING&&onalert)){
         _release_sched_lock();
         return false;
     }
-    if (p->state==SLEEPING||p->state==UNUSED){
+    if (p->state==SLEEPING||p->state==UNUSED||(p->state==DEEPSLEEPING&&!onalert)){
         p->state=RUNNABLE; 
         _insert_into_list(&rq,&p->schinfo.rq);
     }

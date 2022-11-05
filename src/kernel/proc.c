@@ -90,7 +90,7 @@ int wait(int* exitcode)
         return -1;
     }
     _release_spinlock(&plock);
-    wait_sem(&this->childexit);
+    if (!wait_sem(&this->childexit)) return -1;
     _acquire_spinlock(&plock);
     _acquire_sched_lock();
     struct proc* zombienode=NULL;
@@ -148,8 +148,11 @@ int kill(int pid)
     struct proc* killproc = find_proc(pid,&root_proc);
     _release_spinlock(&plock);
     if (killproc!=NULL){
-        activate_proc(killproc);
-        return 0;
+        if (((killproc->ucontext->elr)>>48)==0){
+            alert_proc(killproc);
+            return 0;
+        }
+        else return -1;
     }
     return -1;
 }

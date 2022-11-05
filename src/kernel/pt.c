@@ -40,25 +40,6 @@ PTEntriesPtr get_pte(struct pgdir* pgdir, u64 va, bool alloc)
     }
     p3=(PTEntriesPtr)P2K(PTE_ADDRESS(p2[VA_PART2(va)]));
     return &p3[VA_PART3(va)];
-
-    // u64 va_part[4]={VA_PART0(va),VA_PART1(va),VA_PART2(va),VA_PART3(va)};
-    // if (!pgdir->pt){
-    //     if (!alloc) return NULL;
-    //     else {
-    //         pgdir->pt=kkalloc();
-    //     }
-    // }
-    // PTEntriesPtr pt=pgdir->pt;
-    // for (int i=0;i<3;i++){
-    //     int idx=va_part[i];
-    //     if (!(pt[idx]&PTE_VALID)){
-    //         if (!alloc) return NULL;
-    //         else pt[idx]=K2P(kkalloc())|PTE_TABLE;
-    //     }
-    //     pt=(PTEntriesPtr)P2K(PTE_ADDRESS(pt[idx]));
-    // }
-    // return &pt[va_part[3]];
-
 }
 
 void init_pgdir(struct pgdir* pgdir)

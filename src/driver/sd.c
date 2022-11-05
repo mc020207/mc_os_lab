@@ -203,7 +203,7 @@ void sdrw(buf* b) {
     }
     _release_spinlock(&sdlock);
     while ((b->flags&(B_VALID|B_DIRTY))!=B_VALID){
-        wait_sem(&b->bufsem);
+        unalertable_wait_sem(&b->bufsem);
     }
 }
 
@@ -222,11 +222,12 @@ void sd_test() {
     printk("- sd check rw...\n");
     // Read/write test
     for (int i = 1; i < n; i++) {
-
+        
         // Backup.
         b[0].flags = 0;
         b[0].blockno = (u32)i;
         sdrw(&b[0]);
+        printk("%d\n",i);
         // Write some value.
         b[i].flags = B_DIRTY;
         b[i].blockno = (u32)i;
