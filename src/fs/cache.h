@@ -23,7 +23,7 @@ typedef struct {
     bool acquired;   // is the block already acquired by some thread?
     bool pinned;     // if a block is pinned, it should not be evicted from the
                      // cache.
-    SpinLock lock;  // this lock protects `valid` and `data`.
+    SleepLock lock;  // this lock protects `valid` and `data`.
     bool valid;      // is the content of block loaded from disk?
     u8 data[BLOCK_SIZE];
 } Block;
