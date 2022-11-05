@@ -274,7 +274,6 @@ void test_local_absorption() {
     constexpr usize num_rounds = 1000;
 
     initialize(100, 100);
-
     OpContext ctx;
     bcache.begin_op(&ctx);
     usize t = sblock.num_blocks - 1;
@@ -283,11 +282,11 @@ void test_local_absorption() {
             auto* b = bcache.acquire(t - j);
             b->data[0] = 0xcd;
             bcache.sync(&ctx, b);
+            // printf("loop:%d\n",(int)mock.write_count);
             bcache.release(b);
         }
     }
     bcache.end_op(&ctx);
-
     assert_true(mock.read_count < OP_MAX_NUM_BLOCKS * 5);
     assert_true(mock.write_count < OP_MAX_NUM_BLOCKS * 5);
     for (usize j = 0; j < OP_MAX_NUM_BLOCKS; j++) {
