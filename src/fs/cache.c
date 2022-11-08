@@ -52,7 +52,7 @@ static void init_block(Block* block) {
     init_list_node(&block->node);
     block->acquired = false;
     block->pinned = false;
-    init_sleeplock(&block->lock);
+    init_spinlock(&block->lock);
     block->valid = false;
     memset(block->data, 0, sizeof(block->data));
 }
@@ -78,7 +78,7 @@ static Block* cache_acquire(usize block_no) {
     if (ans){
         ans->acquired=1;
         _release_spinlock(&lock);
-        wait_sem(&ans->lock);
+        _acquire_spinlock(&ans->lock);
         _acquire_spinlock(&lock);
         movetohead(&ans->node);
         _release_spinlock(&lock);
@@ -100,7 +100,7 @@ static Block* cache_acquire(usize block_no) {
     }
     ans=kalloc(sizeof(Block));
     init_block(ans);
-    wait_sem(&ans->lock);
+    _acquire_spinlock(&ans->lock);
     blocknum++;
     ans->block_no=block_no;
     ans->acquired=1;
@@ -116,7 +116,7 @@ static void cache_release(Block* block) {
     // TODO
     _acquire_spinlock(&lock);
     block->acquired=0;
-    post_sem(&block->lock);
+    _release_spinlock(&block->lock);
     _release_spinlock(&lock);
 }
 
