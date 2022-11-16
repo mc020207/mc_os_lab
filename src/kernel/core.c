@@ -22,17 +22,23 @@ NO_RETURN void idle_entry() {
 }
 
 NO_RETURN void kernel_entry() {
-    printk("hello world %d\n", (int)sizeof(struct proc));
+    printk("hello world %d\n",(int)sizeof(struct proc));
 
     proc_test();
     user_proc_test();
     container_test();
     // sd_test();
     
+    // proc_test();
+    // vm_test();
+    // user_proc_test();
+    sd_init();
     do_rest_init();
-
-    while (1)
+    sd_test();
+    
+    while(1){
         yield();
+    }
 }
 
 NO_INLINE NO_RETURN void _panic(const char* file, int line) {
