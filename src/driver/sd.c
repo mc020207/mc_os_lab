@@ -227,7 +227,6 @@ void sd_test() {
         b[0].flags = 0;
         b[0].blockno = (u32)i;
         sdrw(&b[0]);
-        printk("%d\n",i);
         // Write some value.
         b[i].flags = B_DIRTY;
         b[i].blockno = (u32)i;
