@@ -16,11 +16,12 @@ struct schinfo
 {
     //TODO: customize your sched info
     ListNode rq;
+    bool group;
 };
 
 // embedded data for containers
 struct schqueue
 {
     // TODO: customize your sched queue
-    
+    ListNode rq;
 };

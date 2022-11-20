@@ -6,7 +6,7 @@
 #include <kernel/schinfo.h>
 #include <kernel/pt.h>
 #include <kernel/container.h>
-
+#include <kernel/pid.h>
 enum procstate { UNUSED, RUNNABLE, RUNNING, SLEEPING, DEEPSLEEPING, ZOMBIE };
 
 typedef struct UserContext
@@ -23,18 +23,6 @@ typedef struct KernelContext
     u64 x[11]; // x19-29
 
 } KernelContext;
-
-// pid manager's node
-typedef struct s_pid_node {
-    int pid;
-    ListNode node;
-} PIDNode;
-
-// pid manager
-typedef struct s_pid_manager {
-    int max; // max_pid
-    PIDNode freep; // free list of pid
-} PIDManager;
 
 struct proc
 {
@@ -56,8 +44,9 @@ struct proc
     KernelContext* kcontext;
 };
 
-
-
+void init_pidmanager(PIDManager* manager);
+void reuse_pid(PIDManager* manager,int pid);
+int getpid(PIDManager* manager);
 void init_proc(struct proc*);
 WARN_RESULT struct proc* create_proc();
 void set_parent_to_this(struct proc*);

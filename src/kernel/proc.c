@@ -5,23 +5,45 @@
 #include <common/list.h>
 #include <common/string.h>
 #include <kernel/printk.h>
-
+#include <kernel/container.h>
+#include <kernel/pid.h>
 struct proc root_proc;
+extern struct container root_container;
 
-typedef struct pidnode{
-    int id;
-    ListNode lnode;
-} pidnode;
+static PIDManager globalmanager;
 
 void kernel_entry();
 void proc_entry();
 
-ListNode pidpool;
-static int pid;
 static SpinLock plock;
 define_early_init(plock){
     init_spinlock(&plock);
-    init_list_node(&pidpool);
+    init_pidmanager(&globalmanager);
+}
+
+void init_pidmanager(PIDManager* manager){
+    manager->max=0;
+    init_list_node(&manager->freep.node);
+}
+
+void reuse_pid(PIDManager* manager,int pid){
+    PIDNode* pidn=kalloc(sizeof(PIDNode));
+    init_list_node(&pidn->node);
+    pidn->pid=pid;
+    _insert_into_list(&manager->freep.node,&pidn->node);
+}
+
+int getpid(PIDManager* manager){
+    // printk("getpid:%d\n",manager->max);
+    if (_empty_list(&manager->freep.node)){
+        return ++manager->max; 
+    }else{
+        auto pidn=container_of(manager->freep.node.next,PIDNode,node);
+        int pid=pidn->pid;
+        _detach_from_list(&pidn->node);
+        kfree(pidn);
+        return pid;
+    }
 }
 
 void set_parent_to_this(struct proc* proc)
@@ -48,6 +70,7 @@ NO_RETURN void exit(int code)
     _acquire_spinlock(&plock);
     _acquire_sched_lock();
     auto this=thisproc();
+    ASSERT(this != this->container->rootproc && !this->idle);
     ASSERT(this!=&root_proc);
     this->exitcode=code; 
     int times=0;
@@ -61,10 +84,10 @@ NO_RETURN void exit(int code)
         } 
     }
     if (!_empty_list(&this->children)){
-        _merge_list(&root_proc.children,this->children.next);
+        _merge_list(&this->container->rootproc->children,this->children.next);
         _detach_from_list(&this->children);
         _release_sched_lock();
-        for (int i=0;i<times;i++) post_sem(&root_proc.childexit);
+        for (int i=0;i<times;i++) post_sem(&this->container->rootproc->childexit);
         _acquire_sched_lock();
     }
     free_pgdir(&this->pgdir);
@@ -110,11 +133,10 @@ int wait(int* exitcode, int* pid)
         _detach_from_list(&zombienode->schinfo.rq);
         *exitcode=zombienode->exitcode;
         kfree_page(zombienode->kstack);
-        int returnid=zombienode->pid;
-        pidnode* pidn=kalloc(sizeof(pidnode));
-        init_list_node(&pidn->lnode);
-        pidn->id=returnid;
-        _insert_into_list(&pidpool,&pidn->lnode);
+        *pid=zombienode->pid;
+        int returnid=zombienode->localpid;
+        reuse_pid(&globalmanager,zombienode->pid);
+        reuse_pid(&zombienode->container->localpidmanager,zombienode->localpid);
         kfree(zombienode);
         _release_sched_lock();
         _release_spinlock(&plock);
@@ -166,16 +188,16 @@ int start_proc(struct proc* p, void(*entry)(u64), u64 arg)
     // NOTE: be careful of concurrency
     _acquire_spinlock(&plock);
     if (p->parent==NULL){
-        
         p->parent=&root_proc;
         _insert_into_list(&root_proc.children,&p->ptnode);
-        
     }
+    p->localpid=getpid(&p->container->localpidmanager);
     _release_spinlock(&plock);
     p->kcontext->lr=(u64)&proc_entry;
     p->kcontext->x0=(u64)entry;
     p->kcontext->x1=(u64)arg;
-    int id=p->pid; // why?
+    // printk("start_proc: %d\n",p->localpid);
+    int id=p->localpid; // why?
     activate_proc(p);
     return id;
 }
@@ -187,14 +209,8 @@ void init_proc(struct proc* p)
     // NOTE: be careful of concurrency
     _acquire_spinlock(&plock);
     memset(p,0,sizeof(*p));
-    if (_empty_list(&pidpool)){
-        p->pid=++pid; 
-    }else{
-        auto pidn=container_of(pidpool.next,pidnode,lnode);
-        p->pid=pidn->id;
-        _detach_from_list(&pidn->lnode);
-        kfree(pidn);
-    }
+    p->pid=getpid(&globalmanager);
+    p->container=&root_container;
     p->killed=0;
     p->idle=0;
     init_sem(&p->childexit,0);
@@ -203,7 +219,7 @@ void init_proc(struct proc* p)
     init_pgdir(&p->pgdir);
     p->parent=NULL;
     p->kstack=kalloc_page();
-    init_schinfo(&p->schinfo);
+    init_schinfo(&p->schinfo,0);
     p->kcontext=(KernelContext*)((u64)p->kstack+PAGE_SIZE-16-sizeof(KernelContext)-sizeof(UserContext));
     // memset(p->kcontext,0,sizeof(KernelContext));
     p->ucontext=(UserContext*)((u64)p->kstack+PAGE_SIZE-16-sizeof(UserContext));

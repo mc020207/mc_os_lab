@@ -109,8 +109,10 @@ void user_proc_test()
     memset(proc_cnt, 0, sizeof(proc_cnt));
     memset(cpu_cnt, 0, sizeof(cpu_cnt));
     stop = false;
-    for (int i = 0; i < 22; i++)
+    for (int i = 0; i < 22; i++){
+        // printk("%d\n",i);
         _create_user_proc(i);
+    }
     ASSERT(wait_sem(&myrepot_done));
     printk("done\n");
     for (int i = 0; i < 22; i++){

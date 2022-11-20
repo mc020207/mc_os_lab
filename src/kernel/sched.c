@@ -6,21 +6,19 @@
 #include <aarch64/intrinsic.h>
 #include <kernel/cpu.h>
 #include <driver/clock.h>
-
+#include <kernel/container.h>
 extern bool panic_flag;
 extern void swtch(KernelContext* new_ctx, KernelContext** old_ctx);
-
+extern struct container root_container;
 static SpinLock rqlock;
-static ListNode rq;
 static struct timer sched_timer[NCPU];
 
 define_early_init(rq){
     init_spinlock(&rqlock);
-    init_list_node(&rq);
     for (int i=0;i<NCPU;i++){
         sched_timer[i].triggered=1;
         sched_timer[i].data=i;
-        sched_timer[i].elapse=10;
+        sched_timer[i].elapse=5;
         sched_timer[i].handler=&sched_timer_handler;
     }
 }
@@ -31,6 +29,7 @@ define_init(sched){
         // init_proc(p);
         p->idle=1;
         p->state=RUNNING;
+        p->container=&root_container;
         cpus[i].sched.thisproc=cpus[i].sched.idle=p;
     }
 }
@@ -45,6 +44,11 @@ void init_schinfo(struct schinfo* p, bool group)
 {
     //TODO: initialize your customized schinfo for every newly-created process
     init_list_node(&p->rq);
+    p->group=group;
+}
+ 
+void init_schqueue(struct schqueue* que){
+    init_list_node(&que->rq);
 }
 
 void _acquire_sched_lock()
@@ -90,7 +94,7 @@ bool _activate_proc(struct proc* p, bool onalert)
     }
     if (p->state==SLEEPING||p->state==UNUSED||(p->state==DEEPSLEEPING&&!onalert)){
         p->state=RUNNABLE; 
-        _insert_into_list(&rq,&p->schinfo.rq);
+        _insert_into_list(&p->container->schqueue.rq,&p->schinfo.rq);
     }
     _release_sched_lock();
     return true;
@@ -99,7 +103,10 @@ bool _activate_proc(struct proc* p, bool onalert)
 void activate_group(struct container* group)
 {
     // TODO: add the schinfo node of the group to the schqueue of its parent
-
+    _acquire_sched_lock();
+    struct container* father=group->parent;
+    _insert_into_list(&father->schqueue.rq,&group->schinfo.rq);
+    _release_sched_lock();
 }
 
 static void update_this_state(enum procstate new_state)
@@ -112,20 +119,53 @@ static void update_this_state(enum procstate new_state)
     }
     this->state=new_state;
     if (this!=cpus[cpuid()].sched.idle&&(new_state==RUNNABLE||new_state==RUNNING)){
-        _insert_into_list(rq.prev,&this->schinfo.rq);
+        _insert_into_list(this->container->schqueue.rq.prev,&this->schinfo.rq);
     }
 }   
 extern bool panic_flag;
+
+static struct proc* find_proc(ListNode* head){
+    _for_in_list(p,head){
+        if (p==head) continue;
+        auto info=container_of(p,struct schinfo,rq);
+        if (info->group==1){
+            auto nowcontainer=container_of(info,struct container,schinfo);
+            // printk("nowcontainer:%p\n",nowcontainer);
+            auto nxt=find_proc(&nowcontainer->schqueue.rq);
+            if (nxt!=NULL){
+                _detach_from_list(p);
+                _insert_into_list(head->prev,p);
+                return nxt;
+            }
+        }else{
+            auto proc=container_of(p,struct proc,schinfo.rq);
+            if (proc->state==RUNNABLE) return proc;
+        }
+    }
+    return NULL;
+}
+
 static struct proc* pick_next()
 {
     //TODO: if using simple_sched, you should implement this routinue
     // choose the next process to run, and return idle if no runnable process
+    // printk("panic_flag:%d\n",panic_flag);
     if (panic_flag) return cpus[cpuid()].sched.idle;
-    _for_in_list(p,&rq){
-        if (p==&rq) continue;
-        auto proc=container_of(p,struct proc,schinfo.rq);
-        if (proc->state==RUNNABLE) return proc;
-    }
+    // auto this=thisproc();
+    // _for_in_list(p,&this->container->schqueue.rq){
+    //     if (p==&this->container->schqueue.rq) continue;
+    //     auto info=container_of(p,struct schinfo,rq);
+    //     if (info->group==1){
+    //         auto nowcontainer=container_of(info,struct container,schinfo);
+    //         // printk("nowcontainer:%p\n",nowcontainer);
+    //         printk("the first container:%p\n",nowcontainer);
+    //         break;
+    //     }
+    // }
+    auto nxt=find_proc(&root_container.schqueue.rq);
+    // printk("nxt: %p\n",nxt);
+    if (nxt!=NULL) return nxt;
+    // printk("not found\n");
     return cpus[cpuid()].sched.idle;
 }
 

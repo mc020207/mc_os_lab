@@ -32,9 +32,9 @@ NO_RETURN void kernel_entry() {
     // proc_test();
     // vm_test();
     // user_proc_test();
-    sd_init();
-    do_rest_init();
-    sd_test();
+    // sd_init();
+    // do_rest_init();
+    // sd_test();
     
     while(1){
         yield();
