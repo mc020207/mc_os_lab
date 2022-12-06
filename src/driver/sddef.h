@@ -526,8 +526,9 @@ static int sdWaitForInterrupt(unsigned int mask) {
     int ival;
 
     // Wait for the specified interrupt or any error.
-    while (!(*EMMC_INTERRUPT & (u32)waitMask) && count--)
+    while (!(*EMMC_INTERRUPT & (u32)waitMask) && count--){
         sd_delayus(1);
+    }
     ival = (int)(*EMMC_INTERRUPT);
     // printk("- sd intr 0x%x cost %d loops\n", mask, 1000000 - count);
 
@@ -555,7 +556,6 @@ static int sdWaitForInterrupt(unsigned int mask) {
     // Clear the interrupt we were waiting for, leaving any other (non-error)
     // interrupts.
     *EMMC_INTERRUPT = mask;
-
     return SD_OK;
 }
 
