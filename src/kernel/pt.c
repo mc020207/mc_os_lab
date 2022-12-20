@@ -3,8 +3,10 @@
 #include <common/string.h>
 #include <aarch64/intrinsic.h>
 #include <kernel/printk.h>
+#include <kernel/paging.h>
+#include <driver/memlayout.h>
 static void freePTEntry(PTEntriesPtr p,int deep);
-
+extern struct page refpage[PHYSTOP/PAGE_SIZE];
 static void* kkalloc(){
     void *new_page=kalloc_page();
     memset(new_page,0,PAGE_SIZE);
@@ -24,17 +26,17 @@ PTEntriesPtr get_pte(struct pgdir* pgdir, u64 va, bool alloc)
         memset(p0,0,PAGE_SIZE);
         pgdir->pt=p0;
     }
-    if (p0[VA_PART0(va)]==NULL||!PTE_VALID){
+    if (!(p0[VA_PART0(va)]&PTE_VALID)){
         if (alloc==0) return NULL;
         p0[VA_PART0(va)]=K2P(kkalloc())|PTE_TABLE;
     }
     p1=(PTEntriesPtr)P2K(PTE_ADDRESS(p0[VA_PART0(va)]));
-    if (p1[VA_PART1(va)]==NULL||!PTE_VALID){
+    if (!(p1[VA_PART1(va)]&PTE_VALID)){
         if (alloc==0) return NULL;
         p1[VA_PART1(va)]=K2P(kkalloc())|PTE_TABLE;
     }
     p2=(PTEntriesPtr)P2K(PTE_ADDRESS(p1[VA_PART1(va)]));
-    if (p2[VA_PART2(va)]==NULL||!PTE_VALID){
+    if (!(p2[VA_PART2(va)]&PTE_VALID)){
         if (alloc==0) return NULL;
         p2[VA_PART2(va)]=K2P(kkalloc())|PTE_TABLE;
     }
@@ -44,7 +46,18 @@ PTEntriesPtr get_pte(struct pgdir* pgdir, u64 va, bool alloc)
 
 void init_pgdir(struct pgdir* pgdir)
 {
-    pgdir->pt = NULL;
+/*     struct pgdir{
+        PTEntriesPtr pt;
+        SpinLock lock; 
+        ListNode section_head;
+        bool online;
+    }; */
+    pgdir->pt = kalloc_page();
+    memset(pgdir->pt,0,PAGE_SIZE);
+    init_spinlock(&pgdir->lock);
+    init_list_node(&pgdir->section_head);
+    pgdir->online=0;
+    init_sections(&pgdir->section_head);
 }
 
 void free_pgdir(struct pgdir* pgdir)
@@ -55,27 +68,11 @@ void free_pgdir(struct pgdir* pgdir)
     if (!pgdir->pt) return ;
     freePTEntry(pgdir->pt,0);
     pgdir->pt=NULL;
-    // PTEntriesPtr pt0=pgdir->pt;
-    // if (!pt0) return ;
-    // for (int i=0;i<N_PTE_PER_TABLE;i++){
-    //     if(pt0[i]&PTE_VALID){
-    //         PTEntriesPtr pt1=(PTEntriesPtr)P2K(PTE_ADDRESS(pt0[i]));
-    //         for (int j=0;j<N_PTE_PER_TABLE;j++){
-    //             if(pt1[j]&PTE_VALID){
-    //                 PTEntriesPtr pt2=(PTEntriesPtr)P2K(PTE_ADDRESS(pt1[j]));
-    //                 for (int k=0;k<N_PTE_PER_TABLE;k++){
-    //                     if(pt2[k]&PTE_VALID){
-    //                         PTEntriesPtr pt3=(PTEntriesPtr)P2K(PTE_ADDRESS(pt2[k]));
-    //                         kfree_page(pt3);
-    //                     }
-    //                 }
-    //                 kfree_page(pt2);
-    //             }
-    //         }
-    //         kfree_page(pt1);
-    //     }
-    // }
-    // kfree_page(pt0);
+    while (pgdir->section_head.next!=&pgdir->section_head){
+        struct section* now=container_of(pgdir->section_head.next,struct section,stnode);
+        _detach_from_list(pgdir->section_head.next);
+        kfree(now);
+    }
 }
 static void freePTEntry(PTEntriesPtr p,int deep){
     if (deep==3||p==NULL){
@@ -99,5 +96,12 @@ void  attach_pgdir(struct pgdir* pgdir)
         arch_set_ttbr0(K2P(&invalid_pt));
 }
 
+void vmmap(struct pgdir *pd, u64 va, void *ka, u64 flags){
+    auto pte = get_pte(pd, va, true);
+    *pte = K2P(ka) | flags;
+    _increment_rc(&refpage[K2P(ka) / PAGE_SIZE].ref);
+    attach_pgdir(pd);
+    arch_tlbi_vmalle1is();
+}
 
 

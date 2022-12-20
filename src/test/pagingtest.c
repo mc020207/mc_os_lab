@@ -66,8 +66,9 @@ void pgfault_first_test(){
 	if(!check_zero_page())PANIC();
 
 	//swap
-	printk("in swap\n");
+	
 	swapout(pd, st);
+	printk("in swap\n");
 	arch_tlbi_vmalle1is(); 
 	for(i64 i = 0; i < limit; ++i){
 		u64 va = (u64)i * PAGE_SIZE;
@@ -82,7 +83,7 @@ void pgfault_second_test(){
 	//init
 	i64 limit = 10; //do not need too big
 	struct pgdir* pd = &thisproc()->pgdir;
-	init_pgdir(pd); 
+	init_pgdir(pd);
 	attach_pgdir(pd);
 	struct section* st = NULL;
 	_for_in_list(node, &pd->section_head){

@@ -14,6 +14,7 @@ static SpinLock bitmaplock;
 static ListNode head;     // the list of all allocated in-memory block.
 static LogHeader header;  // in-memory copy of log header block.
 static usize blocknum;
+static bool inuse[SWAP_END-SWAP_START];
 // hint: you may need some other variables. Just add them here.
 static void cache_sync(OpContext* ctx, Block* block);
 struct LOG {
@@ -278,4 +279,23 @@ BlockCache bcache = {
     .alloc = cache_alloc,
     .free = cache_free,
 };
-
+u32 find_and_set_8_blocks(){
+    for (int i=0;i<SWAP_END-SWAP_START-8;i++){
+        int j;
+        for (j=0;j<8;j++){
+            if (inuse[i+j]) break;
+        }
+        if (j==8){
+            for (int j=0;j<8;j++) inuse[i+j]=1;
+            return SWAP_START+i;
+        }
+    }
+    PANIC();
+    return 0;
+}
+void release_8_blocks(u32 bno){
+    bno-=SWAP_START;
+    for (int i=0;i<8;i++){
+        inuse[bno+i]=0;
+    }
+}

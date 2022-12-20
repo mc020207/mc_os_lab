@@ -5,12 +5,17 @@
 #include <driver/memlayout.h>
 #include <kernel/printk.h>
 #include <common/string.h>
+#include <fs/cache.h>
 RefCount alloc_page_cnt;
 SpinLock memlock;
+struct page refpage[PHYSTOP/PAGE_SIZE];
+void *zeor_page=0;
+int pagenum=0;
 define_early_init(alloc_page_cnt)
 {
     init_rc(&alloc_page_cnt);
     init_spinlock(&memlock);
+    for (int i=0;i<PHYSTOP/PAGE_SIZE;i++) init_rc(&refpage[i].ref);
 }
 
 // All usable pages are added to the queue.
@@ -29,9 +34,12 @@ typedef struct node{
 node *free[4];
 define_early_init(pages)
 {
-    for (u64 p = PAGE_BASE((u64)&end) + PAGE_SIZE; p < P2K(PHYSTOP); p += PAGE_SIZE){
-	   add_to_queue(&pages, (QueueNode*)p); 
+    for (u64 p = PAGE_BASE((u64)&end) + 2 * PAGE_SIZE; p < P2K(PHYSTOP); p += PAGE_SIZE){
+	   add_to_queue(&pages, (QueueNode*)p);
+        pagenum++;
     }
+    zeor_page=(void *)(PAGE_BASE((u64)&end) + PAGE_SIZE);
+    memset(zeor_page,0,PAGE_SIZE);
 }
 
 // Allocate: fetch a page from the queue of usable pages.
@@ -39,6 +47,7 @@ void* kalloc_page()
 {
     _increment_rc(&alloc_page_cnt);
     void*page=fetch_from_queue(&pages);
+    _increment_rc(&refpage[K2P(page)/PAGE_SIZE].ref);
     return page;
 }
 void merge(node *h){
@@ -54,8 +63,11 @@ void merge(node *h){
 // Free: add the page to the queue of usable pages.
 void kfree_page(void* p)
 {
-    _decrement_rc(&alloc_page_cnt);
-    add_to_queue(&pages, (QueueNode*)p);
+    _decrement_rc(&refpage[K2P(p) / PAGE_SIZE].ref);
+    if (refpage[K2P(p)/PAGE_SIZE].ref.count==0){
+        _decrement_rc(&alloc_page_cnt);
+        add_to_queue(&pages, (QueueNode*)p);
+    }
 }
 void* kalloc(isize size){
     _acquire_spinlock(&memlock);
@@ -94,4 +106,26 @@ void kfree(void* p){
     node *h=(node*)((u64)p-sizeof(node));
     merge(h);
     _release_spinlock(&memlock);
+}
+
+u64 left_page_cnt(){
+    return pagenum-alloc_page_cnt.count;
+}
+WARN_RESULT void* get_zero_page(){
+    return zeor_page;
+}
+bool check_zero_page(){
+    int *temp=(int *)zeor_page;
+    for (u64 i=0;i<PAGE_SIZE/sizeof(int);i++){
+        if (temp[i]) return false;
+    }
+    return true;
+}
+u32 write_page_to_disk(void* ka){
+    u32 bno=find_and_set_8_blocks();
+    for (int i=0;i<8;i++) block_device.write(bno+i,(u8*)ka+i*512);
+    return bno;
+}
+void read_page_from_disk(void* ka, u32 bno){
+    for (int i=0;i<8;i++) block_device.read(bno+i,(u8*)ka+i*512);
 }

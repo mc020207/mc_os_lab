@@ -16,6 +16,10 @@
 // in this struct. All other struct members can be customized by yourself.
 // for example, if you want to implement LFU strategy instead, you can add a
 // counter inside `Block` to maintain the number of times it was accessed.
+#define SWAP_START 800
+#define SWAP_END 1000
+#define SWAP_BIT_START 100
+#define SWAP_BIT_END 125
 typedef struct {
     // accesses to the following 4 members should be guarded by the lock
     // of the block cache.
@@ -105,7 +109,7 @@ typedef struct BlockCache {
 extern BlockCache bcache;
 
 void init_bcache(const SuperBlock* sblock, const BlockDevice* device);
-usize BBLOCK(usize block_no, const SuperBlock* sb);
-void bzero(OpContext* ctx, u32 block_no);
+// usize BBLOCK(usize block_no, const SuperBlock* sb);
+// void bzero(OpContext* ctx, u32 block_no);
 void release_8_blocks(u32 bno);
 u32 find_and_set_8_blocks();

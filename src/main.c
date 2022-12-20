@@ -15,7 +15,7 @@ void kernel_init()
     boot_secondary_cpus = true;
 }
 
-
+// attention!! end_op 
 void main()
 {
     // dhlsb
