@@ -73,9 +73,9 @@ static void _create_user_proc(int i)
         *get_pte(&p->pgdir, 0x400000 + q - (u64)loop_start, true) = K2P(q) | PTE_USER_DATA;
     }
     ASSERT(p->pgdir.pt);
-    p->ucontext->x0 = i;
+    p->ucontext->x[0] = i;
     p->ucontext->elr = 0x400000;
-    p->ucontext->ttbr0 = K2P(p->pgdir.pt);
+    // p->ucontext->ttbr0 = K2P(p->pgdir.pt);
     p->ucontext->spsr = 0;
     pids[i] = p->pid;
     set_parent_to_this(p);
@@ -109,12 +109,16 @@ void user_proc_test()
     memset(proc_cnt, 0, sizeof(proc_cnt));
     memset(cpu_cnt, 0, sizeof(cpu_cnt));
     stop = false;
-    for (int i = 0; i < 22; i++)
+    for (int i = 0; i < 22; i++){
+        // printk("%d\n",i);
         _create_user_proc(i);
+    }
     ASSERT(wait_sem(&myrepot_done));
     printk("done\n");
-    for (int i = 0; i < 22; i++)
+    for (int i = 0; i < 22; i++){
+        printk("kill %d\n",i);
         ASSERT(kill(pids[i]) == 0);
+    }
     for (int i = 0; i < 22; i++)
         _wait_user_proc();
     printk("user_proc_test PASS\nRuntime:\n");

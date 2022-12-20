@@ -15,9 +15,10 @@ void kernel_init()
     boot_secondary_cpus = true;
 }
 
-
+// attention!! end_op 
 void main()
 {
+    // dhlsb
     if (cpuid() == 0)
     {
         kernel_init();
@@ -29,5 +30,5 @@ void main()
     }
 
     // enter idle process
-    set_return_addr(idle_entry);
+    /* if (cpuid()==0) */ set_return_addr(idle_entry);
 }

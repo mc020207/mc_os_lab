@@ -5,7 +5,7 @@
 #include <driver/interrupt.h>
 #include <kernel/proc.h>
 #include <kernel/syscall.h>
-
+#include <kernel/paging.h>
 void trap_global_handler(UserContext* context)
 {
     thisproc()->ucontext = context;
@@ -38,8 +38,9 @@ void trap_global_handler(UserContext* context)
         case ESR_EC_DABORT_EL0:
         case ESR_EC_DABORT_EL1:
         {
-            printk("Page fault %llu\n", ec);
-            PANIC();
+            // printk("CPU:%d Page fault %llu\n", cpuid(),ec);
+            // PANIC();
+            pgfault(iss);
         } break;
         default:
         {
@@ -48,8 +49,8 @@ void trap_global_handler(UserContext* context)
         }
     }
 
-    // TODO: stop killed process while returning to user space
-
+    //TODO: stop killed process while returning to user space
+    if (thisproc()->killed&&((context->elr)>>48)==0) exit(-1);
 }
 
 NO_RETURN void trap_error_handler(u64 type)
