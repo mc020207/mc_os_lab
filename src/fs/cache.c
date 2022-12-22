@@ -21,6 +21,7 @@ struct LOG {
     bool iscommit;
     int outstanding;
     Semaphore logsem;
+    Semaphore check;
 } log;
 // read the content from disk.
 static void movetohead(ListNode* p){
@@ -148,6 +149,7 @@ void init_bcache(const SuperBlock* _sblock, const BlockDevice* _device) {
     header.num_blocks=0;
     log.outstanding=log.iscommit=0;
     init_sem(&log.logsem,0);
+    init_sem(&log.check,0);
     read_header();
     for (usize i=0;i<header.num_blocks;i++){
         copyblockdata(sblock->log_start+i+1,header.block_no[i]);
@@ -206,6 +208,8 @@ static void cache_end_op(OpContext* ctx) {
     if (log.outstanding>0){
         post_sem(&log.logsem);
         _release_spinlock(&loglock);
+        bool f=wait_sem(&log.check);
+        if (!f) return ;
         return ;
     }
     log.iscommit=1;
@@ -223,7 +227,8 @@ static void cache_end_op(OpContext* ctx) {
     header.num_blocks=0;
     write_header();
     log.iscommit=0;
-    post_sem(&log.logsem);
+    post_all_sem(&log.logsem);
+    post_all_sem(&log.check);
     _release_spinlock(&loglock);
     return (void)ctx;
 }
