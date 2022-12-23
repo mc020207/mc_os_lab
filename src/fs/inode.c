@@ -137,7 +137,7 @@ static void inode_clear(OpContext* ctx, Inode* inode) {
     if (inode->entry.indirect!=0){
         Block* inblock=cache->acquire(inode->entry.indirect);
         u32* addrs=get_addrs(inblock);
-        for (int i=0;i<INODE_NUM_INDIRECT;i++){
+        for (usize i=0;i<INODE_NUM_INDIRECT;i++){
             if (addrs[i]) cache->free(ctx,addrs[i]);
         }
         cache->release(inblock);
@@ -220,7 +220,7 @@ static usize inode_map(OpContext* ctx,
     return ans;
 }
 
-static memcmp2(char *s1,char *s2){
+static int memcmp2(const char *s1,const char *s2){
     return memcmp(s1,s2,MAX(strlen(s1),strlen(s2)));
 }
 
@@ -283,7 +283,7 @@ static usize inode_lookup(Inode* inode, const char* name, usize* index) {
     ASSERT(entry->type == INODE_DIRECTORY);
     DirEntry now;
     // if(index) *index=INODE_MAX_BYTES;
-    for (int i=0;i<entry->num_bytes;i+=sizeof(DirEntry)){
+    for (u32 i=0;i<entry->num_bytes;i+=sizeof(DirEntry)){
         inode_read(inode,(u8*)&now,i,sizeof(DirEntry));
         // if (index&&now.inode_no==0&&*index==INODE_MAX_BYTES) *index=i;
         if (now.inode_no&&memcmp2(name,now.name)==0){
@@ -301,7 +301,7 @@ static usize inode_lookup2(Inode* inode, const char* name, usize* index) {
     ASSERT(entry->type == INODE_DIRECTORY);
     DirEntry now;
     if(index) *index=INODE_MAX_BYTES;
-    for (int i=0;i<entry->num_bytes;i+=sizeof(DirEntry)){
+    for (u32 i=0;i<entry->num_bytes;i+=sizeof(DirEntry)){
         inode_read(inode,(u8*)&now,i,sizeof(DirEntry));
         if (index&&now.inode_no==0&&*index==INODE_MAX_BYTES) *index=i;
         if (now.inode_no&&memcmp2(name,now.name)==0){
