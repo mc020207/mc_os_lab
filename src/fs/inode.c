@@ -193,7 +193,7 @@ static usize inode_map(OpContext* ctx,
                        Inode* inode,
                        usize offset,
                        bool* modified) {
-    int numblock=offset/BLOCK_SIZE;
+    int numblock=offset;
     if (numblock<INODE_NUM_DIRECT){
         if (inode->entry.addrs[numblock]==0){
             *modified=1;
@@ -235,7 +235,7 @@ static usize inode_read(Inode* inode, u8* dest, usize offset, usize count) {
     ASSERT(offset <= end);
     for(usize i=offset;i<end;i=(i/BLOCK_SIZE+1)*BLOCK_SIZE){
         bool useless=0;
-        usize bno=inode_map(NULL,inode,i,&useless);
+        usize bno=inode_map(NULL,inode,i/BLOCK_SIZE,&useless);
         Block* now_block=cache->acquire(bno);
         usize len=MIN(BLOCK_SIZE-i%BLOCK_SIZE,end-i);
         memcpy(dest,now_block->data+i%BLOCK_SIZE,len);
@@ -263,7 +263,7 @@ static usize inode_write(OpContext* ctx,
     }
     for(usize i=offset;i<end;i=(i/BLOCK_SIZE+1)*BLOCK_SIZE){
         bool useless=0;
-        usize bno=inode_map(ctx,inode,i,&useless);
+        usize bno=inode_map(ctx,inode,i/BLOCK_SIZE,&useless);
         Block* now_block=cache->acquire(bno);
         usize len=MIN(BLOCK_SIZE-i%BLOCK_SIZE,end-i);
         memcpy(now_block->data+i%BLOCK_SIZE,src,len);
