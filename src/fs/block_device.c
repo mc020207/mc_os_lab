@@ -25,7 +25,7 @@ BlockDevice block_device;
 
 void init_block_device() {
     // FIXME
-    // sd_init();
+    sd_init();
     sd_read(1, sblock_data);
     block_device.read = sd_read;
     block_device.write = sd_write;

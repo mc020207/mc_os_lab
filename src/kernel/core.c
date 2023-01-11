@@ -24,14 +24,15 @@ NO_RETURN void idle_entry() {
 NO_RETURN void kernel_entry() {
     printk("hello world %d\n", (int)sizeof(struct proc));
 
-    // proc_test();
-    // user_proc_test();
-    // container_test();
+    proc_test();
+    user_proc_test();
+    container_test();
     // sd_test();
     
     do_rest_init();
 
-    // TODO: map init.S to user space and trap_return to run icode
+    while (1)
+        yield();
 }
 
 NO_INLINE NO_RETURN void _panic(const char* file, int line) {
