@@ -7,7 +7,7 @@
 #include <fs/inode.h>
 #include <sys/stat.h>
 #include <common/list.h>
-
+#include <kernel/proc.h>
 #define NFILE 65536  // Open files per system
 
 typedef struct file {
@@ -22,10 +22,13 @@ typedef struct file {
 
 struct ftable {
     // TODO: table of file objects in the system
+    SpinLock lock;
+    File filelist[NFILE];
 };
 
 struct oftable {
     // TODO: table of opened file descriptors in a process
+    File* openfile[1024]; // NOFILE=1024 unknown error while using NOFILE
 };
 
 void init_ftable();

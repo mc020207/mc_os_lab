@@ -4,7 +4,9 @@
 #include <kernel/mem.h>
 #include <kernel/printk.h>
 #include <sys/stat.h>
-
+#include <kernel/sched.h>
+#include <assert.h>
+#include <kernel/console.h>
 // this lock mainly prevents concurrent access to inode list `head`, reference
 // count increment and decrement.
 static SpinLock lock;
@@ -114,7 +116,9 @@ static Inode* inode_get(usize inode_no) {
         auto now_inode=container_of(p,Inode,node);
         if (now_inode->inode_no==inode_no){
             _increment_rc(&now_inode->rc);
+            _release_spinlock(&lock);
             inode_lock(now_inode);
+            _acquire_spinlock(&lock);
             inode_sync(NULL,now_inode,0);
             inode_unlock(now_inode);
             _release_spinlock(&lock);
@@ -412,7 +416,36 @@ static Inode* namex(const char* path,
                     char* name,
                     OpContext* ctx) {
     /* TODO: Lab10 Shell */
-    return 0;
+    Inode *ans,*next;
+    if (*path=='/'){
+        ans=inode_get(ROOT_INODE_NO);
+    }else{
+        ans=inode_share(thisproc()->cwd);
+    }
+    while ((path=skipelem(path,name))!=0){
+        inode_lock(ans);
+        if (ans->entry.type==INODE_DIRECTORY){
+            inode_unlock(ans);
+            inode_put(ctx,ans);
+            return NULL;
+        }
+        if (nameiparent&&*path=='\0'){
+            inode_unlock(ans);
+            return ans;
+        }
+        next=inode_lookup(ans,name,0);
+        if (next==NULL){
+            inode_unlock(ans);
+            return NULL;
+        }
+        inode_unlock(ans);
+        ans=next;
+    }
+    if (nameiparent){
+        inode_put(ctx,ans);
+        return NULL;
+    }
+    return ans;
 }
 
 Inode* namei(const char* path, OpContext* ctx) {

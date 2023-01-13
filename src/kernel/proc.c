@@ -7,6 +7,7 @@
 #include <kernel/printk.h>
 #include <kernel/container.h>
 #include <kernel/pid.h>
+#include <file.h>
 struct proc root_proc;
 extern struct container root_container;
 
@@ -221,9 +222,8 @@ void init_proc(struct proc* p)
     p->kstack=kalloc_page();
     init_schinfo(&p->schinfo,0);
     p->kcontext=(KernelContext*)((u64)p->kstack+PAGE_SIZE-16-sizeof(KernelContext)-sizeof(UserContext));
-    // memset(p->kcontext,0,sizeof(KernelContext));
     p->ucontext=(UserContext*)((u64)p->kstack+PAGE_SIZE-16-sizeof(UserContext));
-    // memset(p->ucontext,0,sizeof(UserContext));
+    init_oftable(&p->oftable);
     _release_spinlock(&plock);
 }
 

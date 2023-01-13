@@ -22,7 +22,10 @@
 #include "syscall.h"
 #include <fs/pipe.h>
 #include <common/string.h>
-
+#include <stddef.h>
+#include <kernel/sched.h>
+#include <fs/file.h>
+#include <proc.h>
 struct iovec {
     void* iov_base; /* Starting address. */
     usize iov_len; /* Number of bytes to transfer. */
@@ -33,6 +36,8 @@ struct iovec {
 // return null if the fd is invalid
 static struct file* fd2file(int fd) {
     // TODO
+    if (fd<0||fd>=NOFILE) return NULL;
+    return (thisproc()->oftable.openfile[fd]);
 }
 
 /*
@@ -41,6 +46,13 @@ static struct file* fd2file(int fd) {
  */
 int fdalloc(struct file* f) {
     /* TODO: Lab10 Shell */
+    struct proc* nowproc=thisproc();
+    for (int fd=0;fd<NOFILE;fd++){
+        if (nowproc->oftable.openfile[fd]==0){
+            nowproc->oftable.openfile[fd]=f;
+            return fd;
+        }
+    }
     return -1;
 }
 
@@ -55,6 +67,7 @@ define_syscall(ioctl, int fd, u64 request) {
  */
 define_syscall(mmap, void* addr, int length, int prot, int flags, int fd, int offset) {
     // TODO
+    
 }
 
 define_syscall(munmap, void *addr, size_t length) {
@@ -115,6 +128,9 @@ define_syscall(writev, int fd, struct iovec *iov, int iovcnt) {
  */
 define_syscall(close, int fd) {
     /* TODO: Lab10 Shell */
+    File* f=fd2file(fd);
+    thisproc()->oftable.openfile[fd]=0;
+    fileclose(f);
     return 0;
 }
 
@@ -269,8 +285,41 @@ define_syscall(chdir, const char* path) {
     // TODO
     // change the cwd (current working dictionary) of current process to 'path'
     // you may need to do some validations
+    Inode*ip;
+    struct proc* nowproc=thisproc();
+    OpContext ctx;
+    bcache.begin_op(&ctx);
+    ip=namei(path,&ctx);
+    if (ip==NULL){
+        bcache.end_op(&ctx);
+        return -1;
+    }
+    inodes.lock(ip);
+    if (ip->entry.type==INODE_DIRECTORY){
+        inodes.unlock(ip);
+        bcache.end_op(&ctx);
+        return -1;
+    }
+    inodes.unlock(ip);
+    inodes.put(&ctx,nowproc->cwd);
+    bcache.end_op(&ctx);
+    nowproc->cwd=ip;
+    return 0;
 }
 
-define_syscall(pipe2, char int *fd, int flags) {
+define_syscall(pipe2, int *fd, int flags) { //define_syscall(pipe2, char int *fd, int flags)
     // TODO
+    File*rf,*wf;
+    if (flags) return -1;
+    if (pipeAlloc(&rf,&wf)<0) return -1;
+    int fd0=fdalloc(rf),fd1=fdalloc(wf);
+    if (fd0<0||fd1<0){
+        if (fd0>=0) thisproc()->oftable.openfile[fd0]=0;
+        fileclose(rf);
+        fileclose(wf);
+        return -1;
+    }
+    fd[0]=fd0;
+    fd[1]=fd1;
+    return 0;
 }
