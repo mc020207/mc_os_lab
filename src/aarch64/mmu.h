@@ -39,7 +39,7 @@
 #define N_PTE_PER_TABLE 512
 
 #define PTE_HIGH_NX (1LL << 54)
-
+#define USERTOP     0x0001000000000000
 #define KSPACE_MASK 0xffff000000000000
 
 // convert kernel address into physical address.
@@ -68,3 +68,5 @@ typedef PTEntry *PTEntriesPtr;
 #define VA_PART1(va) (((u64)(va) & 0x7FC0000000) >> 30)
 #define VA_PART2(va) (((u64)(va) & 0x3FE00000) >> 21)
 #define VA_PART3(va) (((u64)(va) & 0x1FF000) >> 12)
+
+#define MAXARG 10

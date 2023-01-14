@@ -7,7 +7,7 @@
 #include <fs/inode.h>
 #include <sys/stat.h>
 #include <common/list.h>
-#include <kernel/proc.h>
+// #include <kernel/proc.h>
 #define NFILE 65536  // Open files per system
 
 typedef struct file {

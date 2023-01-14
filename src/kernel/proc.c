@@ -7,7 +7,7 @@
 #include <kernel/printk.h>
 #include <kernel/container.h>
 #include <kernel/pid.h>
-#include <file.h>
+#include <fs/file.h>
 struct proc root_proc;
 extern struct container root_container;
 
@@ -248,4 +248,33 @@ define_init(root_proc)
 void trap_return();
 int fork() {
     /* TODO: Your code here. */
+    struct proc* cp=thisproc();
+    struct proc* np=create_proc();
+    if (np==NULL){
+        return -1;
+    }
+    struct pgdir* temp=vm_copy(&cp->pgdir);
+    if (temp==NULL){
+        kfree(np->kstack);
+        _acquire_spinlock(&plock);
+        np->state=UNUSED;
+        _release_spinlock(&plock);
+        return -1;
+    }
+    np->pgdir=*temp;
+    np->container=cp->container;
+    np->parent=cp;
+    memmove(np->ucontext, cp->ucontext, sizeof(np->ucontext));
+    // Fork returns 0 in the child.
+    np->ucontext->x[0] = 0;
+    for (int i = 0; i < NOFILE; i++)
+        if (cp->oftable.openfile[i])
+            np->oftable.openfile[i] = filedup(cp->oftable.openfile[i]);
+    np->cwd = inodes.share(cp->cwd);
+    int pid = np->pid;
+    _acquire_spinlock(&plock);
+    _insert_into_list(&cp->children,&np->ptnode);
+    start_proc(np,(void(*)(u64))(cp->kcontext->x0),cp->kcontext->x1);
+    _release_spinlock(&plock);
+    return pid;
 }

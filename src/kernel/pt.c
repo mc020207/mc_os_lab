@@ -108,7 +108,96 @@ void vmmap(struct pgdir *pd, u64 va, void *ka, u64 flags){
  * Allocate physical pages if required.
  * Useful when pgdir is not the current page table.
  */
-int copyout(struct pgdir* pd, void* va, void *p, usize len){
+int copyout(struct pgdir *pd, void *va, void *p, usize len){
     // TODO
+    void *page;
+    usize n, pgoff;
+    u64 *pte;
+    if ((usize)va + len > USERTOP)
+        return -1;
+    for (; len; len -= n, va += n) {
+        pgoff = (usize)va % PAGE_SIZE;
+        if ((pte = get_pte(pd, (u64)va, 1)) == NULL)
+            return -1;
+        if (*pte & PTE_VALID) {
+            page = (void*)P2K(PTE_ADDRESS(*pte));
+        }
+        else {
+            if ((page = kalloc_page()) == NULL)
+                return -1;
+            *pte = K2P(page) | PTE_USER_DATA;
+        }
+        n = MIN(PAGE_SIZE - pgoff, len);
+        if (p){
+            memmove(page + pgoff, p, n);
+            p += n;
+        }
+        else
+            memset(page + pgoff, 0, n);
+    }
+    return 0;
 }
 
+struct pgdir*vm_copy(struct pgdir*pgdir){
+    struct pgdir* newpgdir = kalloc(sizeof(struct pgdir));
+    init_pgdir(newpgdir);
+    if (!newpgdir)
+        return 0;
+
+    for (int i = 0; i < N_PTE_PER_TABLE; i++)
+        if (pgdir->pt[i] & PTE_VALID) {
+            ASSERT(pgdir->pt[i] & PTE_TABLE);
+            PTEntriesPtr pgt1 = (PTEntriesPtr)P2K(PTE_ADDRESS(pgdir->pt[i]));
+            for (int i1 = 0; i1 < N_PTE_PER_TABLE; i1++)
+                if (pgt1[i1] & PTE_VALID) {
+                    ASSERT(pgt1[i1] & PTE_TABLE);
+                    PTEntriesPtr pgt2 = (PTEntriesPtr)P2K(PTE_ADDRESS(pgt1[i1]));
+                    for (int i2 = 0; i2 < N_PTE_PER_TABLE; i2++)
+                        if (pgt2[i2] & PTE_VALID) {
+                            ASSERT(pgt2[i2] & PTE_TABLE);
+                            PTEntriesPtr pgt3 = (PTEntriesPtr)P2K(PTE_ADDRESS(pgt2[i2]));
+                            for (int i3 = 0; i3 < N_PTE_PER_TABLE; i3++)
+                                if (pgt3[i3] & PTE_VALID) {
+                                    ASSERT(pgt3[i3] & PTE_PAGE);
+                                    ASSERT(pgt3[i3] & PTE_USER);
+                                    ASSERT(pgt3[i3] & PTE_NORMAL);
+                                    // assert(PTE_ADDR(pgt3[i3]) < KERNBASE);
+
+                                    u64 pa = PTE_ADDRESS(pgt3[i3]);
+                                    u64 va =(u64)i<<(12+9*3)|(u64)i1<<(12+9*2)|(u64)i2<<(12+9)|i3<<12;
+                                    // void *np = kalloc();
+                                    // if (np == 0) {
+                                    //     vm_free(newpgdir);
+                                    //     warn("kalloc failed");
+                                    //     return 0;
+                                    // }
+                                    // memmove(np, P2V(pa), PGSIZE);
+                                    // // disb();
+                                    // // Flush to memory to sync with icache.
+                                    // // dccivac(P2V(pa), PGSIZE);
+                                    // // disb();
+                                    vmmap(newpgdir,va,(void*)pa,PTE_RO|PTE_USER_DATA);
+                                    // if (uvm_map
+                                    //     (newpgdir, (void *)va, PGSIZE,
+                                    //      V2P((uint64_t) np)) < 0) {
+                                    //     vm_free(newpgdir);
+                                    //     kfree(np);
+                                    //     warn("uvm_map failed");
+                                    //     return 0;
+                                    // }
+                                }
+                        }
+                }
+        }
+    return newpgdir;
+}
+int uvm_alloc(struct pgdir*pgdir,u64 base,u64 stksz,u64 oldsz,u64 newsz){
+    ASSERT(stksz%PAGE_SIZE==0);
+    base=base;
+    for (u64 a=(oldsz+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;a<newsz;a+=PAGE_SIZE){
+        void *p=kalloc_page();
+        ASSERT(p!=NULL);
+        vmmap(pgdir,a,p,PTE_USER_DATA);
+    }
+    return newsz;
+}

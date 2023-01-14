@@ -23,10 +23,10 @@
 #include <fs/pipe.h>
 #include <common/string.h>
 #include <fs/inode.h>
-#include <stddef.h>
+// #include <stddef.h>
 #include <kernel/sched.h>
 #include <fs/file.h>
-#include <proc.h>
+#include <kernel/proc.h>
 struct iovec {
     void* iov_base; /* Starting address. */
     usize iov_len; /* Number of bytes to transfer. */
@@ -68,11 +68,18 @@ define_syscall(ioctl, int fd, u64 request) {
  */
 define_syscall(mmap, void* addr, int length, int prot, int flags, int fd, int offset) {
     // TODO
-    
+    addr=addr;
+    length=length;
+    prot=prot;
+    flags=flags;
+    fd=fd;
+    offset=offset;
+    return 0;
 }
 
-define_syscall(munmap, void *addr, size_t length) {
+define_syscall(munmap, void *addr, u64 length) {
     // TODO
+    return (u64)addr+length;
 }
 
 /*
@@ -82,7 +89,7 @@ define_syscall(dup, int fd) {
     struct file* f = fd2file(fd);
     if (!f)
         return -1;
-    int fd = fdalloc(f);
+    fd = fdalloc(f);
     if (fd < 0)
         return -1;
     filedup(f);
@@ -187,20 +194,6 @@ static int isdirempty(Inode* dp) {
     return 1;
 }
 
-// Is the directory dp empty except for "." and ".." ?
-static int isdirempty(Inode* dp) {
-    usize off;
-    DirEntry de;
-
-    for (off = 2 * sizeof(de); off < dp->entry.num_bytes; off += sizeof(de)) {
-        if (inodes.read(dp, (u8*)&de, off, sizeof(de)) != sizeof(de))
-            PANIC();
-        if (de.inode_no != 0)
-            return 0;
-    }
-    return 1;
-}
-
 define_syscall(unlinkat, int fd, const char* path, int flag) {
     ASSERT(fd == AT_FDCWD && flag == 0);
     Inode *ip, *dp;
@@ -271,6 +264,38 @@ bad:
  */
 Inode* create(const char* path, short type, short major, short minor, OpContext* ctx) {
     /* TODO: Lab10 Shell */
+    Inode* ip,*dir;
+    char name[FILE_NAME_MAX_LENGTH];
+    dir=nameiparent(path,name,ctx);
+    if (dir==NULL) return NULL;
+    inodes.lock(dir);
+    ip=inodes.get(inodes.lookup(dir,name,0));
+    if (ip!=NULL){
+        inodes.unlock(dir);
+        inodes.put(ctx,dir);
+        inodes.lock(ip);
+        if (type==INODE_REGULAR&&ip->entry.type==INODE_REGULAR) return ip;
+        inodes.unlock(ip);
+        inodes.put(ctx,ip);
+        return NULL;
+    }
+    ip=inodes.get(inodes.alloc(ctx,type));
+    ASSERT(ip!=NULL);
+    inodes.lock(ip);
+    bcache.end_op(ctx);
+    ip->entry.major=major;
+    ip->entry.minor=minor;
+    ip->entry.num_links=1;
+    inodes.sync(ctx,ip,true); // equals to iupdate
+    if (type==INODE_DIRECTORY){
+        dir->entry.num_links++;
+        inodes.sync(ctx,dir,true);
+        inodes.insert(ctx,ip,".",ip->inode_no);
+        inodes.insert(ctx,ip,"..",dir->inode_no);
+    }
+    inodes.insert(ctx,dir,name,ip->inode_no);
+    inodes.unlock(dir);
+    inodes.put(ctx,dir);
     return 0;
 }
 
@@ -384,6 +409,7 @@ define_syscall(chdir, const char* path) {
     inodes.lock(ip);
     if (ip->entry.type==INODE_DIRECTORY){
         inodes.unlock(ip);
+        inodes.put(&ctx,ip);
         bcache.end_op(&ctx);
         return -1;
     }

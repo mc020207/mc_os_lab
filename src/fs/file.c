@@ -10,6 +10,7 @@
 #include <fs/pipe.h>
 #include <fs/inode.h>
 #include <fs/cache.h>
+#include <kernel/proc.h>
 #include "fs.h"
 
 static struct ftable ftable;
@@ -27,7 +28,6 @@ void init_oftable(struct oftable *oftable) {
 /* Allocate a file structure. */
 struct file* filealloc() {
     /* TODO: Lab10 Shell */
-    File* ans;
     _acquire_spinlock(&ftable.lock);
     for (int i=0;i<NFILE;i++){
         if (ftable.filelist[i].ref==0){
@@ -89,11 +89,11 @@ int filestat(struct file* f, struct stat* st) {
 isize fileread(struct file* f, char* addr, isize n) {
     /* TODO: Lab10 Shell */
     if (f->readable==0) return -1;
-    if (f->type==FD_PIPE) return pipeRead(f->pipe,addr,n);
+    if (f->type==FD_PIPE) return pipeRead(f->pipe,(u64)addr,n);
     if (f->type==FD_INODE){
         isize ans=0;
         inodes.lock(f->ip);
-        ans=inodes.read(f->ip,addr,f->off,n);
+        ans=inodes.read(f->ip,(u8*)addr,f->off,n);
         if (ans>0) f->off+=ans;
         inodes.unlock(f->ip);
         return ans;
@@ -106,7 +106,7 @@ isize fileread(struct file* f, char* addr, isize n) {
 isize filewrite(struct file* f, char* addr, isize n) {
     /* TODO: Lab10 Shell */
     if (f->writable==0) return -1;
-    if (f->type==FD_PIPE) return pipeWrite(f->pipe,addr,n);
+    if (f->type==FD_PIPE) return pipeWrite(f->pipe,(u64)addr,n);
     if (f->type==FD_INODE){
         isize maxbytes=((OP_MAX_NUM_BLOCKS-4)/2)*BLOCK_SIZE;
         // 2 blocks for each write block
@@ -119,7 +119,7 @@ isize filewrite(struct file* f, char* addr, isize n) {
             OpContext ctx;
             bcache.begin_op(&ctx);
             inodes.lock(f->ip);
-            isize reallen=inodes.write(&ctx,f->ip,addr+idx,f->off,len);
+            isize reallen=inodes.write(&ctx,f->ip,(u8*)(addr+idx),f->off,len);
             // ASSERT(reallen==len);
             if (reallen>0) f->off+=reallen;
             inodes.unlock(f->ip);

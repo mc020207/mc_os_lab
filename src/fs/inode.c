@@ -235,7 +235,7 @@ static usize inode_read(Inode* inode, u8* dest, usize offset, usize count) {
     InodeEntry* entry = &inode->entry;
     if (inode->entry.type == INODE_DEVICE) {
         assert(inode->entry.major == 1);
-        return console_read(inode, dest, count);
+        return console_read(inode, (char*)dest, count);
     }
     if (count + offset > entry->num_bytes)
         count = entry->num_bytes - offset;
@@ -266,7 +266,7 @@ static usize inode_write(OpContext* ctx,
     usize end = offset + count;
     if (inode->entry.type == INODE_DEVICE) {
         assert(inode->entry.major == 1);
-        return console_write(inode, src, count);
+        return console_write(inode, (char*)src, count);
     }
     ASSERT(offset <= entry->num_bytes);
     ASSERT(end <= INODE_MAX_BYTES);
@@ -433,12 +433,14 @@ static Inode* namex(const char* path,
             inode_unlock(ans);
             return ans;
         }
-        next=inode_lookup(ans,name,0);
+        next=inode_get(inode_lookup(ans,name,0));
         if (next==NULL){
             inode_unlock(ans);
+            inode_put(ctx,ans);
             return NULL;
         }
         inode_unlock(ans);
+        inode_put(ctx,ans);
         ans=next;
     }
     if (nameiparent){
