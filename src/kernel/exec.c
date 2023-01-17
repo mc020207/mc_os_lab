@@ -13,7 +13,7 @@
 #include <fs/inode.h>
 #include <kernel/printk.h>
 
-static u64 auxv[][2] = {{AT_PAGESZ, PAGE_SIZE}};
+// static u64 auxv[][2] = {{AT_PAGESZ, PAGE_SIZE}};
 extern int fdalloc(struct file* f);
 
 int execve(const char *path, char *const argv[], char *const envp[]) {
@@ -21,6 +21,8 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	struct proc* curproc=thisproc();
 	struct pgdir oldpigdir=curproc->pgdir;
 	struct pgdir* pgdir=kalloc(sizeof(struct pgdir));
+	init_pgdir(pgdir);
+	printk("in execve:%p\n",curproc);
 	Inode* ip=NULL;
 	if (pgdir==NULL){
 		goto bad;
@@ -28,6 +30,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	OpContext ctx;
 	bcache.begin_op(&ctx);
 	ip=namei(path,&ctx);
+	ASSERT(ip);
 	if (ip==NULL){
 		bcache.end_op(&ctx);
 		goto bad;
@@ -51,34 +54,36 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	curproc->pgdir=*pgdir;
 	u64 sz=0,base=0,stksz=0;
 	int first=1;
+	printk("elf.e_phnum:%d\n",elf.e_phnum);
 	for(i=0,off=elf.e_phoff;i<elf.e_phnum;i++,off+=sizeof(ph)) {
 		if ((inodes.read(ip,(u8*)&ph,off,sizeof(ph)))!=sizeof(ph)){
-			goto bad;
+			PANIC();
 		}
-		if (ph.p_type==PT_LOAD){
+		if (ph.p_type!=PT_LOAD){
 			continue;
 		}
 		if (ph.p_memsz < ph.p_filesz) {
-            goto bad;
+            PANIC();
         }
         if (ph.p_vaddr + ph.p_memsz < ph.p_vaddr) {
-            goto bad;
+            PANIC();
         }
 		if (first){
 			first=0;
 			sz=base=ph.p_vaddr;
 			if (base%PAGE_SIZE!=0){
-				goto bad;
+				PANIC();
 			}
 		}
 		if ((sz=uvm_alloc(pgdir,base,stksz,sz,ph.p_vaddr + ph.p_memsz))==0){
-			goto bad;
+			PANIC();
 		}
 		attach_pgdir(pgdir);
+		printk("filesz:%lld\n",(u64)ph.p_filesz);
 		// attention
     	arch_tlbi_vmalle1is();
 		if (inodes.read(ip, (u8 *)ph.p_vaddr, ph.p_offset, ph.p_filesz)!=ph.p_filesz){
-			goto bad;
+			PANIC();
 		}
 		memset((void *)ph.p_vaddr+ph.p_filesz,0,ph.p_memsz-ph.p_filesz);
 		arch_fence();
@@ -109,13 +114,13 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 			copyout(pgdir,sp,envp[envc],len+1);
 		}
 	}
-	void *newsp=(void*)(((usize)sp-sizeof(auxv)-(envc+argc+4)*8)/16*16);
+	void *newsp=(void*)(((usize)sp-(envc+argc+4)*8)/16*16);
+	copyout(pgdir,newsp,NULL,(void*)sp-newsp);
 	attach_pgdir(pgdir);
 	arch_tlbi_vmalle1is();
 	uint64_t *newargv=newsp+8;
     uint64_t *newenvp=(void*)newargv+8*(argc+1);
-    uint64_t *newauxv=(void*)newenvp+8*(envc+1);
-	memmove(newauxv,auxv,sizeof(auxv));
+	// printk("in exec1: proc%p ucontext:%p elr:%p\n",curproc,curproc->ucontext ,(void*)thisproc()->ucontext->elr);
 	for (int i=envc-1;i>=0;i--){
 		newenvp[i]=(uint64_t)sp;
 		for(;*sp;sp++);
@@ -134,16 +139,10 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	curproc->pgdir=*pgdir;
 	curproc->ucontext->elr=elf.e_entry;
 	curproc->ucontext->sp=(uint64_t)sp;
-	attach_pgdir(&oldpigdir);
-	arch_tlbi_vmalle1is();
-	// const char* last,*cur;
-	// for (last=cur=path;*cur;cur++){
-	// 	if (*cur=='/')
-	// 		last=cur+1;
-	// }
 	attach_pgdir(&curproc->pgdir);
 	arch_tlbi_vmalle1is();
 	free_pgdir(&oldpigdir);
+	printk("in exec1: proc%p ucontext:%p elr:%p\n",curproc,curproc->ucontext ,(void*)thisproc()->ucontext->elr);
 	return 0;
 
 bad:

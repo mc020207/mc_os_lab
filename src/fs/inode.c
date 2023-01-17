@@ -107,8 +107,12 @@ static void inode_sync(OpContext* ctx, Inode* inode, bool do_write) {
 
 // see `inode.h`.
 static Inode* inode_get(usize inode_no) {
+    if (inode_no==0){
+        return NULL;
+    }
     ASSERT(inode_no > 0);
     ASSERT(inode_no < sblock->num_inodes);
+    // printk("inode get\n");
     _acquire_spinlock(&lock);
     // TODO
     _for_in_list(p,&head){
@@ -116,15 +120,17 @@ static Inode* inode_get(usize inode_no) {
         auto now_inode=container_of(p,Inode,node);
         if (now_inode->inode_no==inode_no){
             _increment_rc(&now_inode->rc);
-            _release_spinlock(&lock);
+            // _release_spinlock(&lock);
             inode_lock(now_inode);
-            _acquire_spinlock(&lock);
+            // _acquire_spinlock(&lock);
             inode_sync(NULL,now_inode,0);
             inode_unlock(now_inode);
             _release_spinlock(&lock);
+            
             return now_inode;
         }
     }
+    
     Inode* new_inode=kalloc(sizeof(Inode));
     init_inode(new_inode);
     new_inode->inode_no=inode_no;
@@ -232,9 +238,10 @@ static int memcmp2(const char *s1,const char *s2){
 
 // see `inode.h`.
 static usize inode_read(Inode* inode, u8* dest, usize offset, usize count) {
+    // printk("dest:%p\n",dest);
     InodeEntry* entry = &inode->entry;
     if (inode->entry.type == INODE_DEVICE) {
-        assert(inode->entry.major == 1);
+        ASSERT(inode->entry.major == 1);
         return console_read(inode, (char*)dest, count);
     }
     if (count + offset > entry->num_bytes)
@@ -248,7 +255,10 @@ static usize inode_read(Inode* inode, u8* dest, usize offset, usize count) {
         usize bno=inode_map(NULL,inode,i/BLOCK_SIZE,&useless);
         Block* now_block=cache->acquire(bno);
         usize len=MIN(BLOCK_SIZE-i%BLOCK_SIZE,end-i);
+        // printk("inode_read1 %d dest:%lld len:%d\n",(int)i,(u64)dest,(int)len);
+        // ASSERT(now_block->data+i%BLOCK_SIZE);
         memcpy(dest,now_block->data+i%BLOCK_SIZE,len);
+        // printk("inode_read2 %d\n",(int)i);
         dest+=len;
         cache->release(now_block);
     }
@@ -265,7 +275,7 @@ static usize inode_write(OpContext* ctx,
     InodeEntry* entry = &inode->entry;
     usize end = offset + count;
     if (inode->entry.type == INODE_DEVICE) {
-        assert(inode->entry.major == 1);
+        ASSERT(inode->entry.major == 1);
         return console_write(inode, (char*)src, count);
     }
     ASSERT(offset <= entry->num_bytes);
@@ -296,9 +306,12 @@ static usize inode_lookup(Inode* inode, const char* name, usize* index) {
     InodeEntry* entry = &inode->entry;
     ASSERT(entry->type == INODE_DIRECTORY);
     DirEntry now;
+    
     // if(index) *index=INODE_MAX_BYTES;
     for (u32 i=0;i<entry->num_bytes;i+=sizeof(DirEntry)){
+        // printk("look up\n");
         inode_read(inode,(u8*)&now,i,sizeof(DirEntry));
+        
         // if (index&&now.inode_no==0&&*index==INODE_MAX_BYTES) *index=i;
         if (now.inode_no&&memcmp2(name,now.name)==0){
             if (index) *index=i;
@@ -385,7 +398,6 @@ InodeTree inodes = {
 static const char* skipelem(const char* path, char* name) {
     const char* s;
     int len;
-
     while (*path == '/')
         path++;
     if (*path == 0)
@@ -424,16 +436,19 @@ static Inode* namex(const char* path,
     }
     while ((path=skipelem(path,name))!=0){
         inode_lock(ans);
-        if (ans->entry.type==INODE_DIRECTORY){
+        if (ans->entry.type!=INODE_DIRECTORY){
             inode_unlock(ans);
             inode_put(ctx,ans);
             return NULL;
         }
+        
         if (nameiparent&&*path=='\0'){
             inode_unlock(ans);
             return ans;
         }
+        // printk("in namex\n");
         next=inode_get(inode_lookup(ans,name,0));
+        // printk("in namex\n");
         if (next==NULL){
             inode_unlock(ans);
             inode_put(ctx,ans);
@@ -443,6 +458,7 @@ static Inode* namex(const char* path,
         inode_put(ctx,ans);
         ans=next;
     }
+    
     if (nameiparent){
         inode_put(ctx,ans);
         return NULL;

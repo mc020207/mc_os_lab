@@ -3,6 +3,7 @@
 #include<aarch64/intrinsic.h>
 #include<kernel/sched.h>
 #include<driver/uart.h>
+#include<driver/interrupt.h>
 #define INPUT_BUF 128
 struct {
     char buf[INPUT_BUF];
@@ -18,6 +19,13 @@ define_early_init(conslock){
     init_spinlock(&conslock);
     init_sem(&conssem,0);
 }
+void console_init()
+{
+    init_spinlock(&conslock);
+    init_sem(&conssem, 0);
+
+    set_interrupt_handler(IRQ_AUX, console_intr2);
+}
 static void putc(int c){
     if (c==BACKSPACE){
         uart_put_char('\b');
@@ -29,19 +37,19 @@ static void putc(int c){
 }
 isize console_write(Inode *ip, char *buf, isize n) {
     // TODO
-    inodes.lock(ip);
+    inodes.unlock(ip);
     _acquire_spinlock(&conslock);
     for (isize i=0;i<n;i++){
         putc(buf[i]);
     }
     _release_spinlock(&conslock);
-    inodes.unlock(ip);
+    inodes.lock(ip);
     return n;
 }
 
 isize console_read(Inode *ip, char *dst, isize n) {
     // TODO
-    inodes.lock(ip);
+    inodes.unlock(ip);
     _acquire_spinlock(&conslock);
     isize m=n;
     while (n>0){
@@ -66,10 +74,12 @@ isize console_read(Inode *ip, char *dst, isize n) {
         if (c=='\n') break;
     }
     _release_spinlock(&conslock);
-    inodes.unlock(ip);
+    inodes.lock(ip);
     return m-n;
 }
-
+void console_intr2(){
+    console_init(uart_get_char);
+}
 void console_intr(char (*getc)()) {
     // TODO
     int c=0;

@@ -18,6 +18,7 @@ static Semaphore s1, s2, s3, s4, s5, s6;
 
 static void proc_test_1b(u64 a)
 {
+    printk("proc_test_1b\n");
     switch (a / 10 - 1)
     {
     case 0: break;
@@ -90,6 +91,7 @@ static void proc_test_1a(u64 a)
         ASSERT(s6.val == 0);
     } break;
     }
+    printk("test1a\n");
     exit(a);
 }
 
@@ -104,9 +106,10 @@ static void proc_test_1()
     int pid[10];
     for (int i = 0; i < 10; i++)
     {
-        auto p = create_proc();
+        auto p = create_proc();   
         set_parent_to_this(p);
         pid[i] = start_proc(p, proc_test_1a, i);
+        printk("cpu:%d test1\n",cpuid());
     }
     for (int i = 0; i < 10; i++)
     {
@@ -120,14 +123,18 @@ static void proc_test_1()
 
 void proc_test()
 {
-    printk("proc_test\n");
     auto p = create_proc();
+    // printk("in proc test\n");
+    // print_state();
     int pid = start_proc(p, proc_test_1, 0);
     int t = 0;
+    // printk("in proc test\n");
+    // print_state();
     while (1)
     {
         int code, a;
         int id = wait(&code, &a);
+        printk("cpu%d proc_test\n",cpuid());
         if (id == -1)
             break;
         if (id == pid)

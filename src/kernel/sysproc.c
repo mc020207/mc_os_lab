@@ -27,10 +27,10 @@ define_syscall(myyield) {
     return 0;
 }
 
-define_syscall(yield) {
-    yield();
-    return 0;
-}
+// define_syscall(yield1) {
+//     yield();
+//     return 0;
+// }
 
 define_syscall(pstat) {
     return (u64)left_page_cnt();
@@ -45,6 +45,7 @@ define_syscall(clone, int flag, void* childstk) {
         printk("sys_clone: flags other than SIGCHLD are not supported.\n");
         return -1;
     }
+    childstk=childstk;
     return fork();
 }
 
@@ -64,6 +65,11 @@ int execve(const char* path, char* const argv[], char* const envp[]);
 define_syscall(execve, const char* p, void* argv, void* envp) {
     if (!user_strlen(p, 256))
         return -1;
+    // Inode* ans=inodes.get(1);
+    // inodes.lock(ans);
+    // printk("in syscall bno:%lld\n",inodes.lookup(ans,"init",NULL));
+    // inodes.unlock(ans);
+    // printk("path:%s,argv:%p,envp:%p\n",p,argv,envp);
     return execve(p, argv, envp);
 }
 

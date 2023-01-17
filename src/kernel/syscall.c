@@ -13,9 +13,11 @@ void syscall_entry(UserContext* context)
     // Invoke syscall_table[id] with args and set the return value.
     // id is stored in x8. args are stored in x0-x5. return value is stored in x0.
     u64 id = context->x[8], ret = 0;
+    printk("id:%lld ",id);
     if (id < NR_SYSCALL&&syscall_table[id]!=NULL){
         ret=((u64(*)(u64,u64,u64,u64,u64,u64))syscall_table[id])(context->x[0],context->x[1],context->x[2],context->x[3],context->x[4],context->x[5]);
         context->x[0]=ret;
+        printk("in syscall proc%p context:%p elr:%p returnv:%lld\n",thisproc(),context,(void*)context->elr,ret);
     }
 }
 

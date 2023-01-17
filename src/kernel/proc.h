@@ -9,7 +9,7 @@
 #include <fs/inode.h>
 #include <fs/file.h>
 
-#define NOFILE 1024 /* open files per process */
+#define NOFILE 16 /* open files per process */
 
 #include <kernel/pid.h>
 enum procstate { UNUSED, RUNNABLE, RUNNING, SLEEPING, DEEPSLEEPING, ZOMBIE };
@@ -17,8 +17,10 @@ enum procstate { UNUSED, RUNNABLE, RUNNING, SLEEPING, DEEPSLEEPING, ZOMBIE };
 typedef struct UserContext
 {
     //TODO: customize your trap frame
+    u64 q00,q01;
+    u64 tpidr,useless;
     u64 spsr,elr,lr,sp;
-    u64 x[18];
+    u64 x[32];
 } UserContext;
 
 typedef struct KernelContext
@@ -47,7 +49,7 @@ struct proc
     void* kstack;
     UserContext* ucontext;
     KernelContext* kcontext;
-    struct oftable oftable;
+    struct oftable* oftable;
     Inode* cwd; // current working dictionary
 };
 

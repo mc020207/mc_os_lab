@@ -16,7 +16,7 @@
 #define MASK (-(1<<12))
 #define CLEAN(addr) (addr&MASK)
 define_rest_init(paging){
-    init_block_device();
+    // init_block_device();
 	//TODO init		
 }
 
@@ -110,6 +110,11 @@ void swapin(struct pgdir *pd, struct section *st){
 
 int pgfault(u64 iss)
 {
+    static bool fff=1;
+    if (fff){
+        printk("page\n");
+        fff=0;
+    }
     auto p = thisproc();
     auto pd = &p->pgdir;
     u64 addr = arch_get_far();
@@ -119,6 +124,7 @@ int pgfault(u64 iss)
         sec=container_of(p,struct section,stnode);
         if (addr>=sec->begin) break;
     }
+    ASSERT(sec);
     auto pte = get_pte(pd,addr,true);
     if (*pte == NULL){
         if (sec->flags&ST_SWAP) swapin(pd, sec);

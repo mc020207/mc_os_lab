@@ -30,5 +30,5 @@ void main()
     }
 
     // enter idle process
-    /* if (cpuid()==0) */ set_return_addr(idle_entry);
+    if (cpuid()==0) set_return_addr(idle_entry);
 }

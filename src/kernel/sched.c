@@ -13,6 +13,13 @@ extern struct container root_container;
 static SpinLock rqlock;
 static struct timer sched_timer[NCPU];
 
+
+// void print_state(){
+//     for (int i=0;i<4;i++){
+//         printk("cpu:%d:nowproc:%p state:%d\n",i,cpus[i].sched.thisproc,cpus[i].sched.thisproc->state);
+//     }
+// }
+
 define_early_init(rq){
     init_spinlock(&rqlock);
     for (int i=0;i<NCPU;i++){
@@ -32,6 +39,7 @@ define_init(sched){
         p->container=&root_container;
         cpus[i].sched.thisproc=cpus[i].sched.idle=p;
     }
+    // print_state();
 }
 
 struct proc* thisproc()
@@ -88,6 +96,8 @@ bool _activate_proc(struct proc* p, bool onalert)
     // if the proc->state is SLEEPING/UNUSED, set the process state to RUNNABLE, add it to the sched queue, and return true
     // if the proc->state is DEEPSLEEING, do nothing if onalert or activate it if else, and return the corresponding value.
     _acquire_sched_lock();
+    // printk("in activate_proc\n");
+    // print_state();
     if (p->state==RUNNING||p->state==RUNNABLE||p->state==ZOMBIE||(p->state==DEEPSLEEPING&&onalert)){
         _release_sched_lock();
         return false;
@@ -96,6 +106,8 @@ bool _activate_proc(struct proc* p, bool onalert)
         p->state=RUNNABLE; 
         _insert_into_list(&p->container->schqueue.rq,&p->schinfo.rq);
     }
+    // printk("out activate_proc\n");
+    // print_state();
     _release_sched_lock();
     return true;
 }
@@ -114,6 +126,8 @@ static void update_this_state(enum procstate new_state)
     //TODO: if using simple_sched, you should implement this routinue
     // update the state of current process to new_state, and remove it from the sched queue if new_state=SLEEPING/ZOMBIE
     auto this=thisproc();
+    // printk("in update\n");
+    // print_state();
     if (this!=cpus[cpuid()].sched.idle&&(this->state==RUNNING||this->state==RUNNABLE)){
         _detach_from_list(&this->schinfo.rq);
     }
@@ -121,6 +135,8 @@ static void update_this_state(enum procstate new_state)
     if (this!=cpus[cpuid()].sched.idle&&(new_state==RUNNABLE||new_state==RUNNING)){
         _insert_into_list(this->container->schqueue.rq.prev,&this->schinfo.rq);
     }
+    // printk("out update\n");
+    // print_state();
 }   
 extern bool panic_flag;
 
@@ -162,10 +178,15 @@ static struct proc* pick_next()
     //         break;
     //     }
     // }
+    // printk("in picknxt\n");
+    // print_state();
     auto nxt=find_proc(&root_container.schqueue.rq);
+    // printk("out picknxt\n");
+    // print_state();
     // printk("nxt: %p\n",nxt);
     if (nxt!=NULL) return nxt;
     // printk("not found\n");
+    
     return cpus[cpuid()].sched.idle;
 }
 
@@ -187,6 +208,8 @@ static void update_this_proc(struct proc* p)
 static void simple_sched(enum procstate new_state)
 {
     auto this = thisproc();
+    // printk("cpu%d,in simple_sched\n",cpuid());
+    // print_state();
     ASSERT(this->state == RUNNING);
     if (this->killed&&new_state!=ZOMBIE){
         _release_sched_lock();
@@ -197,6 +220,8 @@ static void simple_sched(enum procstate new_state)
     update_this_proc(next);
     ASSERT(next->state == RUNNABLE);
     next->state = RUNNING;
+    // printk("cpu%d,out simple_sched\n",cpuid());
+    // print_state();
     if (next != this)
     {
         attach_pgdir(&next->pgdir);

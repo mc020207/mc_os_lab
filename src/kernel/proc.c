@@ -197,7 +197,6 @@ int start_proc(struct proc* p, void(*entry)(u64), u64 arg)
     p->kcontext->lr=(u64)&proc_entry;
     p->kcontext->x0=(u64)entry;
     p->kcontext->x1=(u64)arg;
-    // printk("start_proc: %d\n",p->localpid);
     int id=p->localpid; // why?
     activate_proc(p);
     return id;
@@ -209,7 +208,11 @@ void init_proc(struct proc* p)
     // setup the struct proc with kstack and pid allocated
     // NOTE: be careful of concurrency
     _acquire_spinlock(&plock);
-    memset(p,0,sizeof(*p));
+    // printk("in init proc\n");
+    // print_state();
+    memset(p,0,sizeof(struct proc));
+    // printk("out init proc\n");
+    // print_state();
     p->pid=getpid(&globalmanager);
     p->container=&root_container;
     p->killed=0;
@@ -220,17 +223,24 @@ void init_proc(struct proc* p)
     init_pgdir(&p->pgdir);
     p->parent=NULL;
     p->kstack=kalloc_page();
+    p->oftable=kalloc(sizeof(struct oftable));
+    // p->cwd=inodes.get(ROOT_INODE_NO);
+    init_oftable(p->oftable);
     init_schinfo(&p->schinfo,0);
     p->kcontext=(KernelContext*)((u64)p->kstack+PAGE_SIZE-16-sizeof(KernelContext)-sizeof(UserContext));
     p->ucontext=(UserContext*)((u64)p->kstack+PAGE_SIZE-16-sizeof(UserContext));
-    init_oftable(&p->oftable);
     _release_spinlock(&plock);
 }
 
 struct proc* create_proc()
 {
+    // printk("in create proc\n");
+    // print_state();
     struct proc* p = kalloc(sizeof(struct proc));
+    // printk("create proc:%p\n",p);
     init_proc(p);
+    // printk("out create proc\n");
+    // print_state();
     return p;
 }
 
@@ -248,6 +258,7 @@ define_init(root_proc)
 void trap_return();
 int fork() {
     /* TODO: Your code here. */
+    // printk("fork\n");
     struct proc* cp=thisproc();
     struct proc* np=create_proc();
     if (np==NULL){
@@ -255,6 +266,7 @@ int fork() {
     }
     struct pgdir* temp=vm_copy(&cp->pgdir);
     if (temp==NULL){
+        // attention
         kfree(np->kstack);
         _acquire_spinlock(&plock);
         np->state=UNUSED;
@@ -264,17 +276,17 @@ int fork() {
     np->pgdir=*temp;
     np->container=cp->container;
     np->parent=cp;
-    memmove(np->ucontext, cp->ucontext, sizeof(np->ucontext));
+    memmove(np->ucontext, cp->ucontext, sizeof(*np->ucontext));
     // Fork returns 0 in the child.
     np->ucontext->x[0] = 0;
     for (int i = 0; i < NOFILE; i++)
-        if (cp->oftable.openfile[i])
-            np->oftable.openfile[i] = filedup(cp->oftable.openfile[i]);
+        if (cp->oftable->openfile[i])
+            np->oftable->openfile[i] = filedup(cp->oftable->openfile[i]);
     np->cwd = inodes.share(cp->cwd);
     int pid = np->pid;
     _acquire_spinlock(&plock);
     _insert_into_list(&cp->children,&np->ptnode);
-    start_proc(np,(void(*)(u64))(cp->kcontext->x0),cp->kcontext->x1);
     _release_spinlock(&plock);
+    start_proc(np,trap_return,0);
     return pid;
 }

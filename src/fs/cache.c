@@ -77,6 +77,7 @@ static Block* cache_acquire(usize block_no) {
             break;
         }
     }
+    
     if (ans){
         ans->acquired=1;
         _release_spinlock(&lock);
@@ -105,7 +106,9 @@ static Block* cache_acquire(usize block_no) {
     }
     ans=kalloc(sizeof(Block));
     init_block(ans);
+    
     bool f=wait_sem(&ans->lock);
+    
     if (!f){
         PANIC();
     }
@@ -113,7 +116,9 @@ static Block* cache_acquire(usize block_no) {
     ans->block_no=block_no;
     ans->acquired=1;
     ans->valid=1;
+    // printk("cache_acquire\n");
     device_read(ans);
+    // printk("cache_acquire\n");
     _insert_into_list(&head,&ans->node);
     _release_spinlock(&lock);
     return ans;

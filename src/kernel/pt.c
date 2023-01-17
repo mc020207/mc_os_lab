@@ -68,11 +68,11 @@ void free_pgdir(struct pgdir* pgdir)
     if (!pgdir->pt) return ;
     freePTEntry(pgdir->pt,0);
     pgdir->pt=NULL;
-    while (pgdir->section_head.next!=&pgdir->section_head){
-        struct section* now=container_of(pgdir->section_head.next,struct section,stnode);
-        _detach_from_list(pgdir->section_head.next);
-        kfree(now);
-    }
+    // while (pgdir->section_head.next!=&pgdir->section_head){
+    //     struct section* now=container_of(pgdir->section_head.next,struct section,stnode);
+    //     _detach_from_list(pgdir->section_head.next);
+    //     kfree(now);
+    // }
 }
 static void freePTEntry(PTEntriesPtr p,int deep){
     if (deep==3||p==NULL){
@@ -97,11 +97,21 @@ void  attach_pgdir(struct pgdir* pgdir)
 }
 
 void vmmap(struct pgdir *pd, u64 va, void *ka, u64 flags){
+    // printk("in vmmap\n");
     auto pte = get_pte(pd, va, true);
     *pte = K2P(ka) | flags;
     _increment_rc(&refpage[K2P(ka) / PAGE_SIZE].ref);
     attach_pgdir(pd);
     arch_tlbi_vmalle1is();
+    // printk("out vmmap\n");
+}
+void vmmap_without_changepd(struct pgdir *pd, u64 va, void *ka, u64 flags){
+    // printk("in vmmap\n");
+    auto pte = get_pte(pd, va, true);
+    *pte = K2P(ka) | flags;
+    // printk("K2P(ka) / PAGE_SIZE : %lld\n",K2P(ka) / PAGE_SIZE);
+    _increment_rc(&refpage[K2P(ka) / PAGE_SIZE].ref);
+    // printk("out vmmap\n");
 }
 /*
  * Copy len bytes from p to user address va in page table pgdir.
@@ -163,7 +173,7 @@ struct pgdir*vm_copy(struct pgdir*pgdir){
                                     ASSERT(pgt3[i3] & PTE_NORMAL);
                                     // assert(PTE_ADDR(pgt3[i3]) < KERNBASE);
 
-                                    u64 pa = PTE_ADDRESS(pgt3[i3]);
+                                    u64 pa = P2K(PTE_ADDRESS(pgt3[i3]));
                                     u64 va =(u64)i<<(12+9*3)|(u64)i1<<(12+9*2)|(u64)i2<<(12+9)|i3<<12;
                                     // void *np = kalloc();
                                     // if (np == 0) {
@@ -176,7 +186,7 @@ struct pgdir*vm_copy(struct pgdir*pgdir){
                                     // // Flush to memory to sync with icache.
                                     // // dccivac(P2V(pa), PGSIZE);
                                     // // disb();
-                                    vmmap(newpgdir,va,(void*)pa,PTE_RO|PTE_USER_DATA);
+                                    vmmap_without_changepd(newpgdir,va,(void*)pa,PTE_RO|PTE_USER_DATA);
                                     // if (uvm_map
                                     //     (newpgdir, (void *)va, PGSIZE,
                                     //      V2P((uint64_t) np)) < 0) {
@@ -193,11 +203,17 @@ struct pgdir*vm_copy(struct pgdir*pgdir){
 }
 int uvm_alloc(struct pgdir*pgdir,u64 base,u64 stksz,u64 oldsz,u64 newsz){
     ASSERT(stksz%PAGE_SIZE==0);
+    // printk("in uvm_alloc oldsz:%lld newsz%lld\n",oldsz,newsz);
     base=base;
     for (u64 a=(oldsz+PAGE_SIZE-1)/PAGE_SIZE*PAGE_SIZE;a<newsz;a+=PAGE_SIZE){
+        // printk("a:%lld newsz:%lld\n",a,newsz);
         void *p=kalloc_page();
+        // printk("a:%lld newsz:%lld\n",a,newsz);
         ASSERT(p!=NULL);
-        vmmap(pgdir,a,p,PTE_USER_DATA);
+        *get_pte(pgdir,a,true)=K2P(p)|PTE_USER_DATA;
+        // vmmap_without_changepd(pgdir,a,p,PTE_USER_DATA);
+        // printk("a:%lld newsz:%lld\n",a,newsz);
     }
+    // printk("out uvm_alloc\n");
     return newsz;
 }

@@ -38,7 +38,7 @@ struct iovec {
 static struct file* fd2file(int fd) {
     // TODO
     if (fd<0||fd>=NOFILE) return NULL;
-    return (thisproc()->oftable.openfile[fd]);
+    return (thisproc()->oftable->openfile[fd]);
 }
 
 /*
@@ -49,8 +49,8 @@ int fdalloc(struct file* f) {
     /* TODO: Lab10 Shell */
     struct proc* nowproc=thisproc();
     for (int fd=0;fd<NOFILE;fd++){
-        if (nowproc->oftable.openfile[fd]==0){
-            nowproc->oftable.openfile[fd]=f;
+        if (nowproc->oftable->openfile[fd]==0){
+            nowproc->oftable->openfile[fd]=f;
             return fd;
         }
     }
@@ -137,7 +137,7 @@ define_syscall(writev, int fd, struct iovec *iov, int iovcnt) {
 define_syscall(close, int fd) {
     /* TODO: Lab10 Shell */
     File* f=fd2file(fd);
-    thisproc()->oftable.openfile[fd]=0;
+    thisproc()->oftable->openfile[fd]=NULL;
     fileclose(f);
     return 0;
 }
@@ -282,7 +282,7 @@ Inode* create(const char* path, short type, short major, short minor, OpContext*
     ip=inodes.get(inodes.alloc(ctx,type));
     ASSERT(ip!=NULL);
     inodes.lock(ip);
-    bcache.end_op(ctx);
+    // bcache.end_op(ctx);
     ip->entry.major=major;
     ip->entry.minor=minor;
     ip->entry.num_links=1;
@@ -296,14 +296,13 @@ Inode* create(const char* path, short type, short major, short minor, OpContext*
     inodes.insert(ctx,dir,name,ip->inode_no);
     inodes.unlock(dir);
     inodes.put(ctx,dir);
-    return 0;
+    return ip;
 }
 
 define_syscall(openat, int dirfd, const char* path, int omode) {
     int fd;
     struct file* f;
     Inode* ip;
-
     if (!user_strlen(path, 256))
         return -1;
 
@@ -427,7 +426,7 @@ define_syscall(pipe2, int *fd, int flags) { //define_syscall(pipe2, char int *fd
     if (pipeAlloc(&rf,&wf)<0) return -1;
     int fd0=fdalloc(rf),fd1=fdalloc(wf);
     if (fd0<0||fd1<0){
-        if (fd0>=0) thisproc()->oftable.openfile[fd0]=0;
+        if (fd0>=0) thisproc()->oftable->openfile[fd0]=0;
         fileclose(rf);
         fileclose(wf);
         return -1;

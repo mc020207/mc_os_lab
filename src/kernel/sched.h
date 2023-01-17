@@ -21,3 +21,4 @@ void _release_sched_lock();
 #define yield() (_acquire_sched_lock(), _sched(RUNNABLE))
 void sched_timer_handler(struct timer*);
 WARN_RESULT struct proc* thisproc();
+// void print_state();

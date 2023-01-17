@@ -11,11 +11,11 @@ char *envp[] = {"TEST_ENV=FROM_INIT", 0};
 
 int main() {
     int pid, wpid;
-
     if (open("console", O_RDWR) < 0) {
         mknod("console", 1, 1);
         open("console", O_RDWR);
     }
+    printf("************enter init.S****************\n");
     dup(0);  // stdout
     dup(0);  // stderr
 

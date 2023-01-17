@@ -28,7 +28,7 @@ struct ftable {
 
 struct oftable {
     // TODO: table of opened file descriptors in a process
-    File* openfile[1024]; // NOFILE=1024 unknown error while using NOFILE
+    File* openfile[16]; // NOFILE=1024 unknown error while using NOFILE
 };
 
 void init_ftable();

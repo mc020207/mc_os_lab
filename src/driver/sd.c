@@ -62,6 +62,7 @@ void sd_init() {
     init_list_node(&buflist);
     set_interrupt_handler(IRQ_ARASANSDIO,sd_intr);
     set_interrupt_handler(IRQ_SDIO,sd_intr);
+    // set_interrupt_handler(IRQ_GPIO0,sd_intr);
 }
 
 /* Start the request for b. Caller must hold sdlock. */
@@ -142,6 +143,7 @@ void sd_intr() {
      * TODO: Lab5 driver.
      */
     _acquire_spinlock(&sdlock);
+    
     buf *t=container_of(buflist.next,buf,lnode);
     if (t->flags&B_DIRTY){
         sdWaitForInterrupt(INT_DATA_DONE);
