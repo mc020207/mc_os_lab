@@ -222,7 +222,9 @@ static void cache_end_op(OpContext* ctx) {
     for (int i=0;i<(int)header.num_blocks;i++){
         copyblockdata(header.block_no[i],sblock->log_start+i+1);
     }
+    _release_spinlock(&loglock);
     write_header();
+    _acquire_spinlock(&loglock);
     for (int i=0;i<(int)header.num_blocks;i++){
         Block *now=cache_acquire(header.block_no[i]);
         cache_sync(NULL,now);

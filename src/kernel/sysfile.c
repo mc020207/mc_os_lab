@@ -122,10 +122,12 @@ define_syscall(writev, int fd, struct iovec *iov, int iovcnt) {
     if (!f || iovcnt <= 0 || !user_readable(iov, sizeof(struct iovec) * iovcnt))
         return -1;
     usize tot = 0;
+    // int inum=0;
     for (p = iov; p < iov + iovcnt; p++) {
         if (!user_readable(p->iov_base, p->iov_len))
             return -1;
         tot += filewrite(f, p->iov_base, p->iov_len);
+        // printk("write:%d\n",inum++);
     }
     return tot;
 }

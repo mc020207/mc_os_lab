@@ -171,30 +171,15 @@ struct pgdir*vm_copy(struct pgdir*pgdir){
                                     ASSERT(pgt3[i3] & PTE_PAGE);
                                     ASSERT(pgt3[i3] & PTE_USER);
                                     ASSERT(pgt3[i3] & PTE_NORMAL);
-                                    // assert(PTE_ADDR(pgt3[i3]) < KERNBASE);
-
-                                    u64 pa = P2K(PTE_ADDRESS(pgt3[i3]));
                                     u64 va =(u64)i<<(12+9*3)|(u64)i1<<(12+9*2)|(u64)i2<<(12+9)|i3<<12;
-                                    // void *np = kalloc();
-                                    // if (np == 0) {
-                                    //     vm_free(newpgdir);
-                                    //     warn("kalloc failed");
-                                    //     return 0;
-                                    // }
-                                    // memmove(np, P2V(pa), PGSIZE);
-                                    // // disb();
-                                    // // Flush to memory to sync with icache.
-                                    // // dccivac(P2V(pa), PGSIZE);
-                                    // // disb();
-                                    vmmap_without_changepd(newpgdir,va,(void*)pa,PTE_RO|PTE_USER_DATA);
-                                    // if (uvm_map
-                                    //     (newpgdir, (void *)va, PGSIZE,
-                                    //      V2P((uint64_t) np)) < 0) {
-                                    //     vm_free(newpgdir);
-                                    //     kfree(np);
-                                    //     warn("uvm_map failed");
-                                    //     return 0;
-                                    // }
+                                    // u64 pa = P2K(PTE_ADDRESS(pgt3[i3]));
+                                    // vmmap_without_changepd(newpgdir,va,(void*)pa,PTE_RO|PTE_USER_DATA);
+                                    u64 pa=PTE_ADDRESS(pgt3[i3]);
+                                    void* np=kalloc_page();
+                                    ASSERT(np);
+                                    memmove(np,(void*)P2K(pa),PAGE_SIZE);
+                                    auto pte = get_pte(newpgdir, va, true);
+                                    *pte = K2P(np) | PTE_USER_DATA;
                                 }
                         }
                 }

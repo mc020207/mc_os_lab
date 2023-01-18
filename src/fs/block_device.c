@@ -1,7 +1,7 @@
 #include <driver/sd.h>
 #include <fs/block_device.h>
 #include <kernel/printk.h>
-
+#include <kernel/console.h>
 #define BLOCKNO_OFFSET 0x20800
 
 static void sd_read(usize block_no, u8* buffer) {
@@ -37,6 +37,7 @@ void init_block_device() {
 	printk("log_start: %d\n", sb->log_start);
 	printk("inode_start: %d\n", sb->inode_start);
 	printk("bitmap_start: %d\n", sb->bitmap_start);
+    console_init();
 }
 
 const SuperBlock* get_super_block() {

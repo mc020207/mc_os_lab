@@ -83,7 +83,7 @@ static void inode_lock(Inode* inode) {
 static void inode_unlock(Inode* inode) {
     ASSERT(inode->rc.count > 0);
     // TODO
-    _post_sem(&inode->lock);
+    post_sem(&inode->lock);
 }
 
 // see `inode.h`.
@@ -120,13 +120,7 @@ static Inode* inode_get(usize inode_no) {
         auto now_inode=container_of(p,Inode,node);
         if (now_inode->inode_no==inode_no){
             _increment_rc(&now_inode->rc);
-            // _release_spinlock(&lock);
-            inode_lock(now_inode);
-            // _acquire_spinlock(&lock);
-            inode_sync(NULL,now_inode,0);
-            inode_unlock(now_inode);
             _release_spinlock(&lock);
-            
             return now_inode;
         }
     }

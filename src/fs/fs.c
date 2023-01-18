@@ -5,6 +5,7 @@
 #include <fs/inode.h>
 #include <fs/file.h>
 #include <common/defines.h>
+#include <kernel/console.h>
 #include <kernel/init.h>
 #include <kernel/printk.h>
 

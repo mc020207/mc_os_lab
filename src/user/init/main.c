@@ -15,7 +15,6 @@ int main() {
         mknod("console", 1, 1);
         open("console", O_RDWR);
     }
-    printf("************enter init.S****************\n");
     dup(0);  // stdout
     dup(0);  // stderr
 
@@ -27,10 +26,12 @@ int main() {
             exit(1);
         }
         if (pid == 0) {
+            printf("child fork ok begin to execve\n");
             execve("sh", argv, envp);
             printf("init: exec sh failed\n");
             exit(1);
         }
+        printf("father fork ok\n");
         while ((wpid = wait(NULL)) >= 0 && wpid != pid)
             printf("zombie!\n");
     }

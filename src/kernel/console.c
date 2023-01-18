@@ -15,15 +15,9 @@ struct {
 #define BACKSPACE 0x100
 static SpinLock conslock;
 static Semaphore conssem;
-define_early_init(conslock){
-    init_spinlock(&conslock);
-    init_sem(&conssem,0);
-}
-void console_init()
-{
+void console_init(){
     init_spinlock(&conslock);
     init_sem(&conssem, 0);
-
     set_interrupt_handler(IRQ_AUX, console_intr2);
 }
 static void putc(int c){
@@ -46,7 +40,6 @@ isize console_write(Inode *ip, char *buf, isize n) {
     inodes.lock(ip);
     return n;
 }
-
 isize console_read(Inode *ip, char *dst, isize n) {
     // TODO
     inodes.unlock(ip);
@@ -78,13 +71,13 @@ isize console_read(Inode *ip, char *dst, isize n) {
     return m-n;
 }
 void console_intr2(){
-    console_init(uart_get_char);
+    console_intr(uart_get_char);
 }
 void console_intr(char (*getc)()) {
     // TODO
-    int c=0;
+    i8 c=0;
     _acquire_spinlock(&conslock);
-    while ((c=(int)(getc()))&&c>=0){
+    while ((c = getc()) >= 0){
         if (c==C('c')){
             ASSERT(kill(thisproc()->pid)==0);
         }else if (c==C('U')){
@@ -106,9 +99,10 @@ void console_intr(char (*getc)()) {
                 putc(c);
                 if (c=='\n'||c==C('D')||input.e==input.r+INPUT_BUF){
                     input.w=input.e;
-                    _post_sem(&conssem);
+                    post_sem(&conssem);
                 }
             }
         }
     }
+    _release_spinlock(&conslock);
 }

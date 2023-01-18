@@ -22,7 +22,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	struct pgdir oldpigdir=curproc->pgdir;
 	struct pgdir* pgdir=kalloc(sizeof(struct pgdir));
 	init_pgdir(pgdir);
-	printk("in execve:%p\n",curproc);
+	// printk("in execve:%p\n",curproc);
 	Inode* ip=NULL;
 	if (pgdir==NULL){
 		goto bad;
@@ -54,7 +54,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	curproc->pgdir=*pgdir;
 	u64 sz=0,base=0,stksz=0;
 	int first=1;
-	printk("elf.e_phnum:%d\n",elf.e_phnum);
+	// printk("elf.e_phnum:%d\n",elf.e_phnum);
 	for(i=0,off=elf.e_phoff;i<elf.e_phnum;i++,off+=sizeof(ph)) {
 		if ((inodes.read(ip,(u8*)&ph,off,sizeof(ph)))!=sizeof(ph)){
 			PANIC();
@@ -79,7 +79,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 			PANIC();
 		}
 		attach_pgdir(pgdir);
-		printk("filesz:%lld\n",(u64)ph.p_filesz);
+		// printk("filesz:%lld\n",(u64)ph.p_filesz);
 		// attention
     	arch_tlbi_vmalle1is();
 		if (inodes.read(ip, (u8 *)ph.p_vaddr, ph.p_offset, ph.p_filesz)!=ph.p_filesz){
@@ -142,7 +142,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	attach_pgdir(&curproc->pgdir);
 	arch_tlbi_vmalle1is();
 	free_pgdir(&oldpigdir);
-	printk("in exec1: proc%p ucontext:%p elr:%p\n",curproc,curproc->ucontext ,(void*)thisproc()->ucontext->elr);
+	// printk("in exec1: proc%p ucontext:%p elr:%p\n",curproc,curproc->ucontext ,(void*)thisproc()->ucontext->elr);
 	return 0;
 
 bad:

@@ -37,10 +37,10 @@ void pipeClose(Pipe* pi, int writable) {
     _acquire_spinlock(&pi->lock);
     if (writable){
         pi->writeopen=0;
-        _post_sem(&pi->rlock);
+        post_sem(&pi->rlock);
     }else{
         pi->readopen=0;
-        _post_sem(&pi->rlock);
+        post_sem(&pi->rlock);
     }
     if (pi->readopen==0&&pi->writeopen==0){
         _release_spinlock(&pi->lock);
@@ -59,13 +59,13 @@ int pipeWrite(Pipe* pi, u64 addr, int n) {
                 _release_spinlock(&pi->lock);
                 return -1;
             }
-            _post_sem(&pi->rlock);
+            post_sem(&pi->rlock);
             _release_spinlock(&pi->lock);
             unalertable_wait_sem(&pi->wlock);
         }
         pi->data[pi->nwrite++ % PIPESIZE] = *((char *)addr + i);
     }
-    _post_sem(&pi->rlock);
+    post_sem(&pi->rlock);
     _release_spinlock(&pi->lock);
     return n;
 }
@@ -86,7 +86,7 @@ int pipeRead(Pipe* pi, u64 addr, int n) {
         if (pi->nread==pi->nwrite) break;
         *((char *)addr + i) = pi->data[pi->nwrite++ % PIPESIZE];
     }
-    _post_sem(&pi->wlock);
+    post_sem(&pi->wlock);
     _release_spinlock(&pi->lock);
     return i;
 }

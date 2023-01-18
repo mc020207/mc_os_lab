@@ -84,7 +84,7 @@ void swapout(struct pgdir *pd, struct section *st){
     arch_tlbi_vmalle1is();
     sbrk(-(end-begin)/PAGE_SIZE);
     st->end=end;
-    _post_sem(&st->sleeplock);
+    post_sem(&st->sleeplock);
 }
 // Free 8 continuous disk blocks
 void swapin(struct pgdir *pd, struct section *st){
@@ -105,16 +105,11 @@ void swapin(struct pgdir *pd, struct section *st){
     attach_pgdir(pd);
     arch_tlbi_vmalle1is();
     st->flags &= ~ST_SWAP;
-    _post_sem(&st->sleeplock);
+    post_sem(&st->sleeplock);
 }
 
 int pgfault(u64 iss)
 {
-    static bool fff=1;
-    if (fff){
-        printk("page\n");
-        fff=0;
-    }
     auto p = thisproc();
     auto pd = &p->pgdir;
     u64 addr = arch_get_far();
@@ -131,6 +126,7 @@ int pgfault(u64 iss)
         else *pte=K2P(alloc_page_for_user())|PTE_USER_DATA;
     }
     else if (*pte & PTE_RO){
+        printk("READ ONLY\n");
         auto p=alloc_page_for_user();
         memcpy(p,(void *)(CLEAN(*pte)),PAGE_SIZE);
         *pte=K2P(p)|PTE_USER_DATA;
