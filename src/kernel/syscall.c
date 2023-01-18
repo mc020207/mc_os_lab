@@ -35,9 +35,15 @@ bool user_readable(const void* start, usize size) {
 // check if the virtual address [start,start+size) is READABLE & WRITEABLE by the current user process
 bool user_writeable(const void* start, usize size) {
     // TODO
-    start=start;
-    size=size;
-    return true;
+    bool ans=1;
+    for (u64 i=(u64)start;i<(u64)start+size;i=(i/BLOCK_SIZE+1)*BLOCK_SIZE){
+        auto pte=get_pte(&thisproc()->pgdir,i,false);
+        if (pte==NULL||((*pte)&PTE_RO)){
+            ans=0;
+            break;
+        }
+    }
+    return ans;
 }
 
 // get the length of a string including tailing '\0' in the memory space of current user process

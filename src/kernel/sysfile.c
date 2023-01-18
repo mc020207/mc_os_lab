@@ -408,7 +408,7 @@ define_syscall(chdir, const char* path) {
         return -1;
     }
     inodes.lock(ip);
-    if (ip->entry.type==INODE_DIRECTORY){
+    if (ip->entry.type!=INODE_DIRECTORY){
         inodes.unlock(ip);
         inodes.put(&ctx,ip);
         bcache.end_op(&ctx);

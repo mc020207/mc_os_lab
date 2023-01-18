@@ -30,7 +30,7 @@ int execve(const char *path, char *const argv[], char *const envp[]) {
 	OpContext ctx;
 	bcache.begin_op(&ctx);
 	ip=namei(path,&ctx);
-	ASSERT(ip);
+	// ASSERT(ip);
 	if (ip==NULL){
 		bcache.end_op(&ctx);
 		goto bad;
@@ -153,6 +153,6 @@ bad:
 		bcache.end_op(&ctx);
 	}
 	thisproc()->pgdir=oldpigdir;
-	printk("donghongleshabi");
+	printk("donghongleshabi\n");
 	return -1;
 }

@@ -78,7 +78,7 @@ void console_intr(char (*getc)()) {
     i8 c=0;
     _acquire_spinlock(&conslock);
     while ((c = getc()) >= 0){
-        if (c==C('c')){
+        if (c==C('C')){
             ASSERT(kill(thisproc()->pid)==0);
         }else if (c==C('U')){
             while (input.e!=input.w&&input.buf[(input.e-1)%INPUT_BUF]!='\n'){
