@@ -126,10 +126,13 @@ int pgfault(u64 iss)
         else *pte=K2P(alloc_page_for_user())|PTE_USER_DATA;
     }
     else if (*pte & PTE_RO){
-        printk("READ ONLY\n");
-        auto p=alloc_page_for_user();
-        memcpy(p,(void *)(CLEAN(*pte)),PAGE_SIZE);
-        *pte=K2P(p)|PTE_USER_DATA;
+        printk("COW\n");
+        auto p = alloc_page_for_user();
+        kfree_page((void *)P2K(PTE_ADDRESS(*pte)));
+        memmove(p, (void *)P2K(PTE_ADDRESS(*pte)), PAGE_SIZE);
+        ASSERT(p != NULL);
+        ASSERT(check_zero_page());
+        *pte = K2P(p) | PTE_USER_DATA;
     }
     else if (!(*pte&PTE_VALID)&&(sec->flags&ST_SWAP)){
         swapin(pd, sec);

@@ -15,7 +15,7 @@ define_early_init(alloc_page_cnt)
 {
     init_rc(&alloc_page_cnt);
     init_spinlock(&memlock);
-    for (int i=0;i<PHYSTOP/PAGE_SIZE;i++) init_rc(&refpage[i].ref);
+    // for (int i=0;i<PHYSTOP/PAGE_SIZE;i++) init_rc(&refpage[i].ref);
 }
 
 // All usable pages are added to the queue.
@@ -40,6 +40,7 @@ define_early_init(pages)
     }
     zeor_page=(void *)(PAGE_BASE((u64)&end) + PAGE_SIZE);
     memset(zeor_page,0,PAGE_SIZE);
+    refpage[K2P(zeor_page)/PAGE_SIZE].ref.count=1;
 }
 
 // Allocate: fetch a page from the queue of usable pages.
@@ -115,6 +116,7 @@ WARN_RESULT void* get_zero_page(){
     return zeor_page;
 }
 bool check_zero_page(){
+    printk("%lld\n", refpage[K2P(zeor_page) / PAGE_SIZE].ref.count);
     int *temp=(int *)zeor_page;
     for (u64 i=0;i<PAGE_SIZE/sizeof(int);i++){
         if (temp[i]) return false;
