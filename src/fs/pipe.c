@@ -85,7 +85,7 @@ int pipeRead(Pipe* pi, u64 addr, int n) {
     int i;
     for (i=0;i<n;i++){
         if (pi->nread==pi->nwrite) break;
-        *((char *)addr + i) = pi->data[pi->nwrite++ % PIPESIZE];
+        *((char *)addr + i) = pi->data[pi->nread++ % PIPESIZE];
     }
     post_sem(&pi->wlock);
     _release_spinlock(&pi->lock);

@@ -17,5 +17,11 @@ int main(int argc, char *argv[]){
         }
         close(fd);
     }
+    if (argc==1){
+        while ((n = read(0, buf, 512)) > 0) {
+            for (int j = 0; j < n; j++)
+                fprintf(stdout,"%c",buf[j]);
+        }
+    }
     return 0;
 }
