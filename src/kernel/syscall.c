@@ -15,7 +15,7 @@ void syscall_entry(UserContext* context)
     u64 id = context->x[8], ret = 0;
     // printk("id:%d\n",(int)id); 
     if (id < NR_SYSCALL&&syscall_table[id]!=NULL){
-        // if (id==63){
+        // if (id==79){
         //     printk("******56******\n");
         // }
         ret=((u64(*)(u64,u64,u64,u64,u64,u64))syscall_table[id])(context->x[0],context->x[1],context->x[2],context->x[3],context->x[4],context->x[5]);

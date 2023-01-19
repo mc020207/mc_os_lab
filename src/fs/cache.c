@@ -169,17 +169,22 @@ void init_bcache(const SuperBlock* _sblock, const BlockDevice* _device) {
 // see `cache.h`.
 static void cache_begin_op(OpContext* ctx) {
     // TODO
+    // printk("in begin op get loglock\n");
     _acquire_spinlock(&loglock);
     ctx->rm=0;
+    
     while (log.iscommit||header.num_blocks+(log.outstanding+1)*OP_MAX_NUM_BLOCKS>LOG_MAX_SIZE){
+        // printk("out begin op2 back loglock\n");
         _release_spinlock(&loglock);
         bool f=wait_sem(&log.logsem);
         if (!f){
             PANIC();
         }
+        // printk("in begin op2 get loglock\n");
         _acquire_spinlock(&loglock);
     }
     log.outstanding++;
+    // printk("out begin op back loglock\n");
     _release_spinlock(&loglock);
 }
 
@@ -190,10 +195,12 @@ static void cache_sync(OpContext* ctx, Block* block) {
         device_write(block);
         return ;
     }
+    // printk("in sync get loglock\n");
     _acquire_spinlock(&loglock);
     block->pinned=1;
     for (usize i=0;i<header.num_blocks;i++){
         if (block->block_no==header.block_no[i]){
+            // printk("out sync back loglock\n");
             _release_spinlock(&loglock);
             return ;
         }
@@ -203,17 +210,20 @@ static void cache_sync(OpContext* ctx, Block* block) {
     }
     header.block_no[header.num_blocks++]=block->block_no;
     ctx->rm++;
+    // printk("out sync2 back loglock\n");
     _release_spinlock(&loglock);
 }
 
 // see `cache.h`.
 static void cache_end_op(OpContext* ctx) {
     // TODO
+    // printk("in end op get loglock\n");
     _acquire_spinlock(&loglock);
     if (log.iscommit) PANIC();
     log.outstanding--;
     if (log.outstanding>0){
         post_sem(&log.logsem);
+        // printk("out end op back loglock\n");
         _release_spinlock(&loglock);
         bool f=wait_sem(&log.check);
         if (!f) return ;
@@ -222,10 +232,14 @@ static void cache_end_op(OpContext* ctx) {
     log.iscommit=1;
     // printk("num_block:%d\n",header.num_blocks);
     for (int i=0;i<(int)header.num_blocks;i++){
+        _release_spinlock(&loglock);
         copyblockdata(header.block_no[i],sblock->log_start+i+1);
+        _acquire_spinlock(&loglock);
     }
+    // printk("out end op back loglock\n");
     _release_spinlock(&loglock);
     write_header();
+    // printk("in end op2 get loglock\n");
     _acquire_spinlock(&loglock);
     for (int i=0;i<(int)header.num_blocks;i++){
         Block *now=cache_acquire(header.block_no[i]);
@@ -234,12 +248,15 @@ static void cache_end_op(OpContext* ctx) {
         cache_release(now);
     }
     header.num_blocks=0;
+    // printk("out end op back loglock\n");
     _release_spinlock(&loglock);
     write_header();
+    // printk("in end op3 get loglock\n");
     _acquire_spinlock(&loglock);
     log.iscommit=0;
     post_all_sem(&log.logsem);
     post_all_sem(&log.check);
+    // printk("out end op back loglock\n");
     _release_spinlock(&loglock);
     return (void)ctx;
 }

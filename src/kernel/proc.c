@@ -91,15 +91,23 @@ NO_RETURN void exit(int code)
         for (int i=0;i<times;i++) post_sem(&this->container->rootproc->childexit);
         _acquire_sched_lock();
     }
-    free_pgdir(&this->pgdir);
     for (int i=0;i<NOFILE;i++){
         if (this->oftable->openfile[i]){
+            _release_sched_lock();
+            _release_spinlock(&plock);
             fileclose(this->oftable->openfile[i]);
+            _acquire_spinlock(&plock);
+            _acquire_sched_lock();
             this->oftable->openfile[i]=0;
         }
     }
     kfree(this->oftable);
+    _release_sched_lock();
+    _release_spinlock(&plock);
     inodes.put(NULL,this->cwd);
+    _acquire_spinlock(&plock);
+    _acquire_sched_lock();
+    free_pgdir(&this->pgdir);
     _release_sched_lock();
     post_sem(&thisproc()->parent->childexit); 
     _acquire_sched_lock();
