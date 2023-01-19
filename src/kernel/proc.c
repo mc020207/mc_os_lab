@@ -104,7 +104,7 @@ NO_RETURN void exit(int code)
     kfree(this->oftable);
     _release_sched_lock();
     _release_spinlock(&plock);
-    inodes.put(NULL,this->cwd);
+    if (this->cwd) inodes.put(NULL,this->cwd);
     _acquire_spinlock(&plock);
     _acquire_sched_lock();
     free_pgdir(&this->pgdir);
