@@ -8,14 +8,14 @@
 int main(int argc, char *argv[]){
     // TODO
     int i;
+    // printf("argc:%d\n",argc);
     if (argc < 2){
-        fprintf(2, "Usage: mkdir files...\n");
+        printf("give at least 2 args\n");
         exit(1);
     }
     for (i = 1; i < argc; i++){
         if (mkdirat(AT_FDCWD,argv[i],0) < 0){
-            fprintf(2, "mkdir: %s failed to create\n", argv[i]);
-            break;
+            printf("%s failed\n", argv[i]);
         }
     }
     exit(0);

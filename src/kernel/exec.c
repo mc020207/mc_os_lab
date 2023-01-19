@@ -153,6 +153,6 @@ bad:
 		bcache.end_op(&ctx);
 	}
 	thisproc()->pgdir=oldpigdir;
-	printk("donghongleshabi\n");
+	// printk("donghongleshabi\n");
 	return -1;
 }
