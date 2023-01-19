@@ -9,7 +9,7 @@ int pipeAlloc(File** f0, File** f1) {
     p=NULL;
     *f0=*f1=0;
     if ((*f0=filealloc())==0||(*f1=filealloc())==0) goto bad;
-    if ((p==(Pipe*)kalloc(sizeof(Pipe)))==0) goto bad;
+    if ((p=(Pipe*)kalloc(sizeof(Pipe)))==0) goto bad;
     p->readopen = 1;
     p->writeopen = 1;
     p->nwrite = 0;
@@ -25,6 +25,7 @@ int pipeAlloc(File** f0, File** f1) {
     (*f1)->readable = 0;
     (*f1)->writable = 1;
     (*f1)->pipe = p;
+    return 0;
 bad:
     if (p) kfree((char *)p);
     if (*f0) fileclose(*f0);
@@ -40,7 +41,7 @@ void pipeClose(Pipe* pi, int writable) {
         post_sem(&pi->rlock);
     }else{
         pi->readopen=0;
-        post_sem(&pi->rlock);
+        post_sem(&pi->wlock);
     }
     if (pi->readopen==0&&pi->writeopen==0){
         _release_spinlock(&pi->lock);

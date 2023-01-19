@@ -117,7 +117,9 @@ static Block* cache_acquire(usize block_no) {
     ans->acquired=1;
     ans->valid=1;
     // printk("cache_acquire\n");
+    _release_spinlock(&lock);
     device_read(ans);
+    _acquire_spinlock(&lock);
     // printk("cache_acquire\n");
     _insert_into_list(&head,&ans->node);
     _release_spinlock(&lock);
@@ -232,7 +234,9 @@ static void cache_end_op(OpContext* ctx) {
         cache_release(now);
     }
     header.num_blocks=0;
+    _release_spinlock(&loglock);
     write_header();
+    _acquire_spinlock(&loglock);
     log.iscommit=0;
     post_all_sem(&log.logsem);
     post_all_sem(&log.check);
